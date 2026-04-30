@@ -1,41 +1,33 @@
 {
   "project_info": {
-    "project_number": "106422037058",
-    "project_id": "erp-controle-de-vendas-musgo",
-    "storage_bucket": "erp-controle-de-vendas-musgo.firebasestorage.app"
+    "project_number": "817212625915",
+    "project_id": "musgo-2e173",
+    "storage_bucket": "musgo-2e173.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:106422037058:android:1476076c985a0d985c9bdb",
+        "mobilesdk_app_id": "1:817212625915:android:361669a3a1a95ca86b315e",
         "android_client_info": {
-          "package_name": "com.gestaopro.erp"
+          "package_name": "com.musgo.appvendas"
         }
       },
       "oauth_client": [
         {
-          "client_id": "106422037058-ivku14376mm2atcboq3k53ghkaqst7h6.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.gestaopro.erp",
-            "certificate_hash": "25fcf1dae29d867dc7f67fa7291354451a2ee78b"
-          }
-        },
-        {
-          "client_id": "106422037058-o6nfd5rdni63ds5jel795edqhc41nuqg.apps.googleusercontent.com",
+          "client_id": "817212625915-j8efdbjqhp2e3fij1v0ilv5vcpt6sbob.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyBeEd-trbtgmRmbX474QtAu2b7F-0qoTb8"
+          "current_key": "AIzaSyDL6YEeQt5Ag3yKKPXEMeeUVQYM3uLEMcE"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "106422037058-o6nfd5rdni63ds5jel795edqhc41nuqg.apps.googleusercontent.com",
+              "client_id": "817212625915-j8efdbjqhp2e3fij1v0ilv5vcpt6sbob.apps.googleusercontent.com",
               "client_type": 3
             }
           ]
@@ -44,27 +36,27 @@
     },
     {
       "client_info": {
-        "mobilesdk_app_id": "1:106422037058:android:f347854b97445f735c9bdb",
+        "mobilesdk_app_id": "1:817212625915:android:2446c31cb7f12d2b6b315e",
         "android_client_info": {
-          "package_name": "com.musgo.appvendas"
+          "package_name": "com.musgo.vendas"
         }
       },
       "oauth_client": [
         {
-          "client_id": "106422037058-o6nfd5rdni63ds5jel795edqhc41nuqg.apps.googleusercontent.com",
+          "client_id": "817212625915-j8efdbjqhp2e3fij1v0ilv5vcpt6sbob.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyBeEd-trbtgmRmbX474QtAu2b7F-0qoTb8"
+          "current_key": "AIzaSyDL6YEeQt5Ag3yKKPXEMeeUVQYM3uLEMcE"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "106422037058-o6nfd5rdni63ds5jel795edqhc41nuqg.apps.googleusercontent.com",
+              "client_id": "817212625915-j8efdbjqhp2e3fij1v0ilv5vcpt6sbob.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

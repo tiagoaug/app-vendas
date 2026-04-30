@@ -1787,7 +1787,7 @@ export default function App() {
   const viewTitle = useMemo(() => {
     switch (currentView) {
       case ViewType.DASHBOARD:
-        return "Musgo";
+        return "Vendas Pro";
       case ViewType.PRODUCTS:
         return "Produção de Produtos";
       case ViewType.STOCK:

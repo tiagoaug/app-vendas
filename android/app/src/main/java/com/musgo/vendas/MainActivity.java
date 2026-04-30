@@ -1,4 +1,4 @@
-package com.musgo.appvendas;
+package com.musgo.vendas;
 
 import com.getcapacitor.BridgeActivity;
 

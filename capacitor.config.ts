@@ -1,9 +1,15 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.musgo.appvendas',
+  appId: 'com.musgo.vendas',
   appName: 'App Vendas',
-  webDir: 'dist'
+  webDir: 'dist',
+  plugins: {
+    FirebaseAuthentication: {
+      skipNativeAuth: false,
+      providers: ['google.com'],
+    },
+  },
 };
 
 export default config;

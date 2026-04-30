@@ -2,6 +2,7 @@
 <resources>
     <string name="app_name">App Vendas</string>
     <string name="title_activity_main">App Vendas</string>
-    <string name="package_name">com.musgo.appvendas</string>
-    <string name="custom_url_scheme">com.musgo.appvendas</string>
+    <string name="package_name">com.musgo.vendas</string>
+    <string name="custom_url_scheme">com.musgo.vendas</string>
+    <string name="server_client_id">817212625915-j8efdbjqhp2e3fij1v0ilv5vcpt6sbob.apps.googleusercontent.com</string>
 </resources>

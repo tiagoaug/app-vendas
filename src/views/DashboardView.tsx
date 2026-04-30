@@ -792,7 +792,7 @@ export default function DashboardView({
                                   <Landmark size={12} className="text-slate-400" />
                                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Empresa</p>
                                </div>
-                               <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-tight leading-none">Musgo Calcados</p>
+                               <p className="text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-tight leading-none">Vendas Pro</p>
                             </div>
                          </div>
 
