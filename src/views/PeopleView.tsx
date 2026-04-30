@@ -186,7 +186,7 @@ export default function PeopleView({ people, sales, purchases, transactions, onA
 
       <button 
         onClick={() => { setEditingPerson(null); setIsModalOpen(true); }}
-        className={`fixed bottom-24 right-6 w-14 h-14 bg-slate-900 dark:bg-indigo-600 text-white rounded-[2rem] shadow-2xl flex items-center justify-center active:scale-95 transition-all z-20 border-4 border-white dark:border-slate-800 ${isDarkMode ? 'shadow-none' : 'shadow-slate-300'}`}
+        className={`fixed bottom-32 right-6 w-14 h-14 bg-slate-900 dark:bg-indigo-600 text-white rounded-[2rem] shadow-2xl flex items-center justify-center active:scale-95 transition-all z-20 border-4 border-white dark:border-slate-800 ${isDarkMode ? 'shadow-none' : 'shadow-slate-300'}`}
       >
         <Plus size={32} strokeWidth={3} />
       </button>
