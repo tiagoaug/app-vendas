@@ -38,4 +38,6 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Permissions for the Contacts plugin -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
 </manifest>

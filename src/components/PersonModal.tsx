@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Person } from '../types';
+import { Capacitor } from '@capacitor/core';
+import { CapacitorContacts } from '@capgo/capacitor-contacts';
 
 interface PersonModalProps {
   isOpen: boolean;
@@ -28,26 +30,58 @@ export default function PersonModal({ isOpen, onClose, onSave, person }: PersonM
   }, [person]);
 
   const handleImportContact = async () => {
-    if ('contacts' in navigator && 'select' in (navigator as any).contacts) {
-      if (window.self !== window.top) {
-        alert('A importação de contatos não funciona dentro deste preview. Por favor, abra o aplicativo em uma nova aba.');
-        return;
-      }
+    if (Capacitor.isNativePlatform()) {
       try {
-        const props = ['name', 'tel', 'email'];
-        const contacts = await (navigator as any).contacts.select(props, { multiple: false });
-        if (contacts.length > 0) {
-          const contact = contacts[0];
-          setName(contact.name?.[0] || '');
-          if (contact.tel && contact.tel.length > 0) setPhone(contact.tel[0]);
-          if (contact.email && contact.email.length > 0) setEmail(contact.email[0]);
+        const permission = await CapacitorContacts.requestPermissions();
+        if (permission.readContacts !== 'granted') {
+          alert('Permissão de contatos negada.');
+          return;
         }
-      } catch (err) {
-        console.error('Error importing contact:', err);
-        alert('Erro ao importar contato.');
+        
+        const result = await CapacitorContacts.pickContact({
+          multiple: false
+        });
+        
+        if (result.contacts && result.contacts.length > 0) {
+          const contact = result.contacts[0];
+          const cName = contact.fullName || contact.givenName || '';
+          if (cName) setName(cName);
+          
+          if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+            const num = contact.phoneNumbers[0].value;
+            if (num) setPhone(num);
+          }
+          if (contact.emailAddresses && contact.emailAddresses.length > 0) {
+            const em = contact.emailAddresses[0].value;
+            if (em) setEmail(em);
+          }
+        }
+      } catch (err: any) {
+        console.error('Error picking contact:', err);
+        alert('Erro ao selecionar contato: ' + (err.message || JSON.stringify(err)));
       }
     } else {
-      alert('Seu navegador não suporta a importação de contatos.');
+      if ('contacts' in navigator && 'select' in (navigator as any).contacts) {
+        if (window.self !== window.top) {
+          alert('A importação de contatos não funciona dentro deste preview. Por favor, abra o aplicativo em uma nova aba.');
+          return;
+        }
+        try {
+          const props = ['name', 'tel', 'email'];
+          const contacts = await (navigator as any).contacts.select(props, { multiple: false });
+          if (contacts.length > 0) {
+            const contact = contacts[0];
+            setName(contact.name?.[0] || '');
+            if (contact.tel && contact.tel.length > 0) setPhone(contact.tel[0]);
+            if (contact.email && contact.email.length > 0) setEmail(contact.email[0]);
+          }
+        } catch (err) {
+          console.error('Error importing contact:', err);
+          alert('Erro ao importar contato.');
+        }
+      } else {
+        alert('A importação de contatos nativa funciona apenas no aplicativo (celular).');
+      }
     }
   };
 
