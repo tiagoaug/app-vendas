@@ -1,0 +1,76 @@
+{
+  "project_info": {
+    "project_number": "106422037058",
+    "project_id": "erp-controle-de-vendas-musgo",
+    "storage_bucket": "erp-controle-de-vendas-musgo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:106422037058:android:1476076c985a0d985c9bdb",
+        "android_client_info": {
+          "package_name": "com.gestaopro.erp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "106422037058-ivku14376mm2atcboq3k53ghkaqst7h6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.gestaopro.erp",
+            "certificate_hash": "25fcf1dae29d867dc7f67fa7291354451a2ee78b"
+          }
+        },
+        {
+          "client_id": "106422037058-o6nfd5rdni63ds5jel795edqhc41nuqg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBeEd-trbtgmRmbX474QtAu2b7F-0qoTb8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "106422037058-o6nfd5rdni63ds5jel795edqhc41nuqg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:106422037058:android:f347854b97445f735c9bdb",
+        "android_client_info": {
+          "package_name": "com.musgo.appvendas"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "106422037058-o6nfd5rdni63ds5jel795edqhc41nuqg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBeEd-trbtgmRmbX474QtAu2b7F-0qoTb8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "106422037058-o6nfd5rdni63ds5jel795edqhc41nuqg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
