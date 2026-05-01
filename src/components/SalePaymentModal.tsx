@@ -189,7 +189,17 @@ export default function SalePaymentModal({
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1 mb-2 block">Valor do Recebimento</label>
+                  <div className="flex items-center justify-between ml-1 mb-2">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Valor do Recebimento</label>
+                    <button 
+                      type="button"
+                      onClick={() => setAmount(remaining.toFixed(2))}
+                      className="text-[9px] font-black uppercase text-indigo-500 tracking-widest hover:text-indigo-600 transition-colors flex items-center gap-1"
+                    >
+                      <CheckCircle2 size={10} />
+                      Quitar Total
+                    </button>
+                  </div>
                   <div className="relative">
                     <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input 

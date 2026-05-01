@@ -277,16 +277,16 @@ export default function SalesView({
                   : 'bg-white border-slate-100'
             }`}>
               {/* Row 1: Customer & Status */}
-              <div className="flex justify-between items-start z-10">
-                <div className="flex items-center gap-3">
+              <div className="flex justify-between items-start z-10 gap-4">
+                <div className="flex items-center gap-3 min-w-0">
                    <div 
                     onClick={() => setSelectedSale(sale)}
-                    className={`flex items-center justify-center cursor-pointer transition-transform hover:scale-110 ${sale.status === SaleStatus.QUOTE ? 'text-amber-500' : 'text-indigo-600 dark:text-indigo-400'}`}
+                    className={`flex items-center justify-center cursor-pointer transition-transform hover:scale-110 shrink-0 ${sale.status === SaleStatus.QUOTE ? 'text-amber-500' : 'text-indigo-600 dark:text-indigo-400'}`}
                    >
                       <ShoppingBag size={28} strokeWidth={2.5} />
                    </div>
-                   <div>
-                      <h3 className={`font-extrabold text-[13px] tracking-tight leading-none uppercase ${sale.status === SaleStatus.CANCELLED ? 'text-slate-500' : isDarkMode ? 'text-white' : 'text-slate-800'}`}>{sale.customerName || 'Cliente'}</h3>
+                   <div className="min-w-0">
+                      <h3 className={`font-extrabold text-[13px] tracking-tight leading-none uppercase truncate ${sale.status === SaleStatus.CANCELLED ? 'text-slate-500' : isDarkMode ? 'text-white' : 'text-slate-800'}`}>{sale.customerName || 'Cliente'}</h3>
                       <div className="flex gap-1 flex-wrap mt-1.5">
                          {sale.status === SaleStatus.CANCELLED ? (
                            <span className="text-[7px] font-black uppercase px-2 py-0.5 rounded-lg tracking-widest bg-slate-900 text-slate-400 border border-slate-800">
@@ -302,23 +302,33 @@ export default function SalesView({
                                   {sale.paymentStatus === PaymentStatus.PAID ? 'Quitado' : 'Pendente'}
                                </span>
                              )}
+                             {sale.paymentStatus === PaymentStatus.PENDING && sale.dueDate && (
+                               <span className={`text-[7px] font-black uppercase px-2 py-0.5 rounded-lg tracking-widest flex items-center gap-1 ${new Date(sale.dueDate) < new Date() ? 'bg-rose-500 text-white shadow-sm shadow-rose-200' : 'bg-indigo-50 text-indigo-600 border border-indigo-100'}`}>
+                                  <Clock size={8} />
+                                  Venc: {format(sale.dueDate, "dd/MM", { locale: ptBR })}
+                               </span>
+                             )}
                            </>
                          )}
                       </div>
                    </div>
                 </div>
 
-                <div className="flex flex-col items-end gap-1 text-right">
-                  <div className="flex items-center gap-1.5 text-[8px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-[0.2em]">
+                <div className="flex flex-col items-end gap-1.5 text-right shrink-0">
+                  <div className="flex items-center gap-1.5 text-[8px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-[0.2em]">
                     <Hash size={9} strokeWidth={3} />
                     #{sale.orderNumber}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[7px] text-slate-300 dark:text-slate-600 font-black uppercase tracking-widest">
+                    <Calendar size={10} />
+                    {format(sale.date, "dd/MM/yyyy", { locale: ptBR })}
                   </div>
                 </div>
               </div>
 
               {/* Row 2 (Added Line): Financial Summary & Type */}
-              <div className={`p-3 rounded-2xl flex items-center justify-between z-10 border ${isDarkMode ? 'bg-slate-800/40 border-slate-800/50' : 'bg-slate-50/50 border-slate-100/50'}`}>
-                <div className="flex gap-4">
+              <div className={`p-4 rounded-3xl flex items-center justify-between z-10 border ${isDarkMode ? 'bg-slate-800/40 border-slate-800/50' : 'bg-slate-50/50 border-slate-100/50'}`}>
+                <div className={`grid ${remaining > 0 && sale.status === SaleStatus.SALE ? 'grid-cols-3' : 'grid-cols-2'} gap-6 flex-1`}>
                   <div className="flex flex-col">
                     <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Total</p>
                     <p className={`text-[12px] font-black tracking-tight ${sale.status === SaleStatus.CANCELLED ? 'text-slate-500' : 'text-indigo-600 dark:text-indigo-400'}`}>
@@ -341,7 +351,7 @@ export default function SalesView({
                   )}
                 </div>
 
-                <div className="flex flex-col items-end gap-1">
+                <div className="flex flex-col items-end gap-1 shrink-0 ml-4">
                   {Array.from(new Set(sale.items.map(i => i.saleType))).map((type, idx) => (
                     <span key={idx} className={`text-[7px] font-black uppercase px-2 py-0.5 rounded-md leading-none tracking-widest ${type === SaleType.WHOLESALE ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/20' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'}`}>
                       {type === SaleType.WHOLESALE ? 'Atacado' : 'Varejo'}
@@ -382,23 +392,8 @@ export default function SalesView({
                 )}
               </div>
 
-              {/* Row 4: Footer Info & Actions */}
-              <div className={`px-1 flex items-center justify-between border-t pt-3 ${sale.status === SaleStatus.CANCELLED ? 'border-slate-800/50' : 'border-slate-50 dark:border-slate-800/50'}`}>
-                <div className="flex items-center gap-4">
-                  {/* Quantity info removed, replaced with Date info as requested */}
-                  <div className="flex items-center gap-1.5 text-[8px] text-slate-400 font-black uppercase tracking-widest">
-                    <Calendar size={10} className="text-slate-300 dark:text-slate-600" />
-                    {format(sale.date, "dd/MM/yyyy - HH:mm", { locale: ptBR })}
-                  </div>
-                  {sale.paymentStatus === PaymentStatus.PENDING && sale.dueDate && (
-                    <div className={`flex items-center gap-1 text-[8px] font-black uppercase tracking-widest ${new Date(sale.dueDate) < new Date() ? 'text-rose-500' : 'text-indigo-500'}`}>
-                      <Clock size={10} />
-                      Venc: {format(sale.dueDate, "dd/MM", { locale: ptBR })}
-                    </div>
-                  )}
-                </div>
-
-              <div className="flex items-center gap-1.5 relative">
+              <div className={`flex justify-end border-t pt-3 mt-1 ${sale.status === SaleStatus.CANCELLED ? 'border-slate-800/50' : 'border-slate-50 dark:border-slate-800/50'}`}>
+                <div className="flex items-center gap-1.5 relative">
                 <div className={`flex items-center gap-1 p-0.5 rounded-lg border shadow-sm ${
                   sale.status === SaleStatus.CANCELLED
                     ? 'bg-slate-800 border-slate-700'
