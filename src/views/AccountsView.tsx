@@ -87,7 +87,7 @@ export default function AccountsView({ accounts, onAdd, onEdit, onDelete, onAdju
             <DollarSign size={20} />
             <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">SALDO TOTAL CONSOLIDADO</span>
           </div>
-          <span className="text-4xl font-black text-slate-800 dark:text-white">R$ {totalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+          <span className="text-4xl font-black text-slate-800 dark:text-white">R$ {totalBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
         
         <div className="grid grid-cols-2 gap-3">
@@ -154,7 +154,7 @@ export default function AccountsView({ accounts, onAdd, onEdit, onDelete, onAdju
                     <h3 className={`font-black text-sm uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{account.name}</h3>
                     <div className="flex items-center gap-2 mt-1">
                        <p className={`text-lg font-black tracking-tighter italic ${isPersonal ? 'text-indigo-500' : 'text-indigo-600 dark:text-indigo-400'}`}>
-                         R$ {account.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                         R$ {account.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                        </p>
                     </div>
                   </div>
@@ -171,12 +171,16 @@ export default function AccountsView({ accounts, onAdd, onEdit, onDelete, onAdju
                    <button 
                      onClick={() => onEdit(account.id)}
                      className={`p-2 rounded-xl transition-all ${isDarkMode ? 'text-slate-700 hover:text-indigo-400' : 'text-slate-200 hover:text-indigo-600'}`}
+                     title="Editar Conta"
+                     aria-label="Editar Conta"
                    >
                      <Edit size={18} strokeWidth={2.5} />
                    </button>
                    <button 
                      onClick={() => handleDeleteClick(account.id)}
                      className={`p-2 rounded-xl transition-all ${isDarkMode ? 'text-slate-700 hover:text-rose-500' : 'text-slate-200 hover:text-rose-500'}`}
+                     title="Excluir Conta"
+                     aria-label="Excluir Conta"
                    >
                      <Trash2 size={18} strokeWidth={2.5} />
                    </button>

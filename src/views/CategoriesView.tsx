@@ -48,7 +48,7 @@ export default function CategoriesView({ categories, onAdd, onEdit, onDelete, is
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 pb-64 min-h-screen px-4">
       <ConfirmDialog
         isOpen={isConfirmOpen}
         title="Excluir Categoria?"
@@ -116,12 +116,19 @@ export default function CategoriesView({ categories, onAdd, onEdit, onDelete, is
             </div>
 
             <div className="flex items-center gap-2">
-              <button onClick={() => { setEditingCategory(category); setIsModalOpen(true); }} className={`p-2 transition-colors ${isDarkMode ? 'text-slate-700 hover:text-indigo-400' : 'text-slate-200 hover:text-indigo-600'}`}>
+              <button 
+                onClick={() => { setEditingCategory(category); setIsModalOpen(true); }} 
+                className={`p-2 transition-colors ${isDarkMode ? 'text-slate-700 hover:text-indigo-400' : 'text-slate-200 hover:text-indigo-600'}`}
+                title="Editar Categoria"
+                aria-label="Editar Categoria"
+              >
                 <Edit size={18} />
               </button>
               <button 
                 onClick={() => handleDeleteClick(category.id)}
                 className={`p-2 transition-colors ${isDarkMode ? 'text-slate-700 hover:text-rose-500' : 'text-slate-200 hover:text-rose-500'}`}
+                title="Excluir Categoria"
+                aria-label="Excluir Categoria"
               >
                 <Trash2 size={18} />
               </button>

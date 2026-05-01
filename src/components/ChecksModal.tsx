@@ -39,11 +39,11 @@ export default function ChecksModal({
       `Cheque ${idx + 1}:\n` +
       `- Número: ${c.number}\n` +
       `- Vencimento: ${format(c.dueDate, 'dd/MM/yyyy')}\n` +
-      `- Valor: R$ ${c.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n` +
+      `- Valor: R$ ${c.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
       `- Status: ${statusMap[c.status]?.label || c.status}`
     ).join('\n\n');
 
-    const summary = `HISTÓRICO DE CHEQUES - Compra #${purchase.id.slice(-6).toUpperCase()}\nFornecedor: ${supplier?.name || '---'}\nTotal em Cheques: R$ ${checks.reduce((acc, c) => acc + c.value, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n${checkList}`;
+    const summary = `HISTÓRICO DE CHEQUES - Compra #${purchase.id.slice(-6).toUpperCase()}\nFornecedor: ${supplier?.name || '---'}\nTotal em Cheques: R$ ${checks.reduce((acc, c) => acc + c.value, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n${checkList}`;
 
     navigator.clipboard.writeText(summary);
     alert('Registros de cheques copiados!');
@@ -66,14 +66,14 @@ export default function ChecksModal({
     const totalValue = checks.reduce((acc, c) => acc + c.value, 0);
     doc.setFontSize(12);
     doc.setTextColor(0);
-    doc.text(`Total em Cheques: R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 14, 45);
+    doc.text(`Total em Cheques: R$ ${totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 14, 45);
     
     // Table
     const tableData = checks.map(c => [
       c.number,
       format(c.dueDate, 'dd/MM/yyyy'),
       statusMap[c.status]?.label || c.status,
-      `R$ ${c.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      `R$ ${c.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     ]);
 
     autoTable(doc, {
@@ -104,7 +104,12 @@ export default function ChecksModal({
             <h2 className={`text-lg font-black uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Relatório de Cheques</h2>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Compra de {supplier?.name || "---"}</p>
           </div>
-          <button onClick={onClose} className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-400">
+          <button 
+            onClick={onClose} 
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-400"
+            title="Fechar"
+            aria-label="Fechar"
+          >
             <X size={20} />
           </button>
         </div>
@@ -151,7 +156,7 @@ export default function ChecksModal({
                   </div>
                   <div className="text-right">
                     <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest leading-none mb-1">Valor</p>
-                    <p className="text-sm font-black tracking-tight text-indigo-600 dark:text-indigo-400">R$ {check.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-sm font-black tracking-tight text-indigo-600 dark:text-indigo-400">R$ {check.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                   </div>
                 </div>
 

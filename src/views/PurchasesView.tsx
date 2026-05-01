@@ -13,6 +13,7 @@ import {
   Search,
   Filter,
   Clipboard,
+  Hash,
 } from "lucide-react";
 import { format, isSameMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -137,6 +138,8 @@ export default function PurchasesView({
         </div>
         <button
           onClick={onAdd}
+          title="Nova Compra"
+          aria-label="Adicionar nova compra"
           className="bg-blue-600 text-white p-3 rounded-[1rem] shadow-sm active:scale-95 transition-all flex items-center justify-center cursor-pointer hover:bg-blue-700"
         >
           <Plus size={20} strokeWidth={2.5} />
@@ -152,6 +155,7 @@ export default function PurchasesView({
           <input
             type="text"
             placeholder="Buscar fornecedor ou nota..."
+            title="Pesquisar"
             className={`w-full pl-10 pr-4 py-3 rounded-2xl text-[13px] font-bold outline-none transition-all ${isDarkMode ? "bg-slate-900 text-white placeholder-slate-500 focus:ring-2 focus:ring-slate-700" : "bg-white text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-slate-200 shadow-sm border border-slate-100"}`}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -187,6 +191,7 @@ export default function PurchasesView({
             className={`min-w-[100px] px-3 py-1.5 rounded-2xl text-[10px] font-black uppercase tracking-widest outline-none border shadow-sm dark:shadow-none ${isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-100 text-slate-800"} focus:ring-2 focus:ring-indigo-500`}
             value={periodFilter}
             onChange={(e) => setPeriodFilter(e.target.value)}
+            title="Filtrar por Período"
           >
             <option value="">MESES</option>
             {availableMonths.map(month => {
@@ -232,9 +237,15 @@ export default function PurchasesView({
                     >
                       {supplier?.name || "Fornecedor"}
                     </h3>
-                    <div className="flex items-center gap-1.5 mt-1.5 text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">
-                      <Calendar size={12} strokeWidth={3} />
-                      {format(purchase.date, "dd MMM yyyy", { locale: ptBR })}
+                    <div className="flex flex-col gap-1.5 mt-1.5">
+                      <div className="flex items-center gap-1.5 text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">
+                        <Calendar size={12} strokeWidth={3} />
+                        {format(purchase.date, "dd MMM yyyy", { locale: ptBR })}
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[9px] text-indigo-500 dark:text-indigo-400 font-black uppercase tracking-widest">
+                        <Hash size={12} strokeWidth={3} />
+                        #{purchase.batchNumber || purchase.id.slice(-6).toUpperCase()}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -242,7 +253,7 @@ export default function PurchasesView({
                   <p
                     className="text-[15px] font-black tracking-tight leading-none text-rose-600 dark:text-rose-400"
                   >
-                    R$ {purchase.total.toLocaleString("pt-BR")}
+                    R$ {purchase.total.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                   <div className="flex flex-wrap justify-end gap-1">
                     <span
@@ -312,6 +323,8 @@ export default function PurchasesView({
                       e.stopPropagation();
                       onEdit(purchase.id);
                     }}
+                    title="Editar Compra"
+                    aria-label="Editar esta compra"
                     className="p-2 text-slate-300 dark:text-slate-600 hover:text-indigo-500 transition-colors transform active:scale-90"
                   >
                     <Edit2 size={20} strokeWidth={2.5} />
@@ -321,6 +334,8 @@ export default function PurchasesView({
                       e.stopPropagation();
                       setItemToDelete(purchase.id);
                     }}
+                    title="Excluir Compra"
+                    aria-label="Excluir esta compra"
                     className="p-2 text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors transform active:scale-90"
                   >
                     <Trash2 size={20} strokeWidth={2.5} />
@@ -332,6 +347,8 @@ export default function PurchasesView({
                         setSelectedNote(purchase.notes || null);
                       }}
                       className="p-2 text-amber-500 dark:text-amber-400 active:scale-90"
+                      title="Ver Observações"
+                      aria-label="Ver observações desta compra"
                     >
                       <MessageSquare size={18} strokeWidth={2.5} />
                     </button>

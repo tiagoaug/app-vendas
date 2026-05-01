@@ -68,6 +68,8 @@ export default function PersonModal({ isOpen, onClose, onSave, person }: PersonM
           <button 
             onClick={onClose}
             className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-100 text-slate-500 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700 transition-colors"
+            title="Fechar"
+            aria-label="Fechar"
           >
             <X size={20} />
           </button>

@@ -91,7 +91,12 @@ export default function PartialPaymentModal({
             </h2>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Fornecedor: {supplier?.name || "---"}</p>
           </div>
-          <button onClick={onClose} className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-400">
+          <button 
+            onClick={onClose} 
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-400"
+            title="Fechar"
+            aria-label="Fechar"
+          >
             <X size={20} />
           </button>
         </div>
@@ -138,7 +143,17 @@ export default function PartialPaymentModal({
 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1 mb-2 block">Valor do Pagamento</label>
+                  <div className="flex items-center justify-between ml-1 mb-2">
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest block">Valor do Pagamento</label>
+                    <button 
+                      type="button"
+                      onClick={() => setAmount(remaining.toFixed(2))}
+                      className="text-[9px] font-black uppercase text-indigo-500 tracking-widest hover:text-indigo-600 transition-colors flex items-center gap-1"
+                    >
+                      <CheckCircle2 size={10} />
+                      Quitar Total
+                    </button>
+                  </div>
                   <div className="relative">
                     <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                     <input 
@@ -163,6 +178,8 @@ export default function PartialPaymentModal({
                         className={`w-full border-none rounded-2xl py-3.5 pl-12 pr-4 text-xs font-black uppercase tracking-widest focus:ring-4 focus:ring-indigo-500/10 appearance-none ${isDarkMode ? 'bg-slate-800 text-white' : 'bg-slate-50 text-slate-900'}`}
                         value={accountId}
                         onChange={(e) => setAccountId(e.target.value)}
+                        title="Selecione a conta bancária"
+                        aria-label="Selecione a conta bancária"
                       >
                         {accounts.map(acc => (
                           <option key={acc.id} value={acc.id}>{acc.name} - R$ {acc.balance.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}</option>

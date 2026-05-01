@@ -87,22 +87,28 @@ export default function StockView({
           {!isEditing ? (
             <button 
               onClick={handleStartEditing}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-2"
+              className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[1.2rem] text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 flex items-center gap-2 active:scale-95"
+              title="Iniciar Balanço de Estoque"
+              aria-label="Entrar no modo de edição de estoque para fazer balanço"
             >
-              <TrendingUp size={14} /> Fazer Balanço
+              <TrendingUp size={14} strokeWidth={3} /> Fazer Balanço
             </button>
           ) : (
             <div className="flex gap-2">
               <button 
                 onClick={() => setIsEditing(false)}
-                className="px-4 py-2 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                className="px-4 py-3 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                title="Cancelar Balanço"
+                aria-label="Sair do modo de edição sem salvar"
               >
                 Cancelar
               </button>
               <button 
                 onClick={handleSaveAll}
                 disabled={isSaving}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50 active:scale-95"
+                title="Salvar Balanço"
+                aria-label="Salvar todas as alterações de estoque"
               >
                 {isSaving ? 'Salvando...' : 'Salvar Balanço'}
               </button>
@@ -110,10 +116,16 @@ export default function StockView({
           )}
         </div>
 
-        <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'} shadow-sm mb-2`}>
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Valor Total Estimado em Estoque</p>
-            <p className={`text-2xl font-black italic tracking-tighter ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                R$ {products.reduce((acc, p) => acc + (p.variations.reduce((vAcc, v) => vAcc + (Object.values(v.stock) as number[]).reduce((sum, s) => sum + s, 0), 0) * p.costPrice), 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+        <div className={`p-6 rounded-[2rem] border shadow-xl relative overflow-hidden mb-2 ${
+          isDarkMode 
+            ? 'bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/30 border-slate-800' 
+            : 'bg-gradient-to-br from-indigo-600 via-indigo-600 to-indigo-800 border-indigo-500 text-white'
+        }`}>
+            <div className="absolute -right-10 -top-10 w-40 h-40 bg-white/5 rounded-full blur-2xl pointer-events-none" />
+            <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${isDarkMode ? 'text-slate-500' : 'text-indigo-100/70'}`}>Valor Estimado em Estoque</p>
+            <p className={`text-3xl font-black italic tracking-tighter ${isDarkMode ? 'text-white' : 'text-white'}`}>
+                <span className="text-sm not-italic opacity-50 mr-2">R$</span>
+                {products.reduce((acc, p) => acc + (p.variations.reduce((vAcc, v) => vAcc + (Object.values(v.stock) as number[]).reduce((sum, s) => sum + s, 0), 0) * (p.costPrice || 0)), 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
         </div>
 
@@ -125,8 +137,10 @@ export default function StockView({
           <input
             type="text"
             placeholder="Procurar no estoque..."
-            className={`w-full border rounded-[1rem] py-4 pl-12 pr-4 text-sm font-medium focus:outline-none focus:ring-4 focus:ring-indigo-500/5 dark:focus:ring-indigo-500/10 placeholder:text-slate-400 dark:placeholder:text-slate-600 text-slate-800 dark:text-slate-100 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"}`}
+            className={`w-full border rounded-[1.2rem] py-4 pl-12 pr-4 text-[11px] font-black uppercase tracking-widest focus:outline-none focus:ring-4 focus:ring-indigo-500/5 dark:focus:ring-indigo-500/10 placeholder:text-slate-400 dark:placeholder:text-slate-600 text-slate-800 dark:text-slate-100 transition-all ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-sm"}`}
             value={searchTerm}
+            title="Pesquisar no Estoque"
+            aria-label="Campo de pesquisa de produtos no estoque"
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
@@ -222,9 +236,11 @@ const StockCard: React.FC<{
                                  {isEditing ? (
                                    <input 
                                      type="number"
-                                     className="w-full bg-slate-50 dark:bg-slate-800 border-none text-center text-[10px] font-black p-0 focus:ring-0"
+                                     className="w-full bg-slate-50 dark:bg-slate-800 border-none text-center text-[11px] font-black p-0 focus:ring-0"
                                      value={qty === 0 ? '' : qty}
                                      placeholder="0"
+                                     title={`Estoque Tamanho ${size}`}
+                                     aria-label={`Editar estoque do tamanho ${size}`}
                                      onChange={(e) => onUpdateStock(v.id, size, e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                                    />
                                  ) : (
@@ -247,6 +263,8 @@ const StockCard: React.FC<{
                                    className="w-16 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-center text-[11px] font-black py-1 focus:ring-2 focus:ring-indigo-500/10"
                                    value={v.stock['WHOLESALE'] === 0 ? '' : v.stock['WHOLESALE'] || ''}
                                    placeholder="0"
+                                   title="Estoque Grade"
+                                   aria-label="Editar estoque da grade atacado"
                                    onChange={(e) => onUpdateStock(v.id, 'WHOLESALE', e.target.value === '' ? 0 : parseInt(e.target.value) || 0)}
                                  />
                               </div>

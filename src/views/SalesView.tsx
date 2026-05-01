@@ -112,14 +112,16 @@ export default function SalesView({
       const sizeDesc = item.size ? ` (TAM ${item.size})` : '';
       const typeDesc = item.saleType === SaleType.RETAIL ? 'pares' : 'grades';
       
-      return `📦 *${p?.name}${variantDesc}*${sizeDesc}\n   Qtd: ${item.quantity} ${typeDesc}\n   Un: R$ ${item.price.toLocaleString('pt-BR')}\n   Sub: R$ ${(item.price * item.quantity).toLocaleString('pt-BR')}`;
+      return `📦 *${p?.name}${variantDesc}*${sizeDesc}\n   Qtd: ${item.quantity} ${typeDesc}\n   Un: R$ ${item.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n   Sub: R$ ${(item.price * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }).join('\n\n');
 
     const paymentMethod = paymentMethods.find(pm => pm.id === sale.paymentMethodId);
-    const paymentInfo = paymentMethod?.value ? `\n\n💳 *Pagamento: ${paymentMethod.name}*\nRef: ${paymentMethod.value}` : `\n\n💳 *Pagamento: ${paymentMethod?.name || 'A definir'}*`;
+    const paymentInfo = paymentMethod?.value ? `\n\n💳 *Pagamento: ${paymentMethod.name}*\nchave pix: ${paymentMethod.value}` : `\n\n💳 *Pagamento: ${paymentMethod?.name || 'A definir'}*`;
 
     const statusText = sale.status === SaleStatus.QUOTE ? 'ORÇAMENTO' : 'PEDIDO';
-    return `Olá ${customer?.name || sale.customerName || 'Cliente'}!\n\nSeu ${statusText} #${sale.orderNumber} na Calçados.\n\n*ITENS:*\n${itemsText}\n\n------------------\n💰 *Subtotal:* R$ ${sale.subtotal.toLocaleString('pt-BR')}\n📉 *Desconto:* R$ ${sale.discount.toLocaleString('pt-BR')}\n💎 *TOTAL: R$ ${sale.total.toLocaleString('pt-BR')}*\n------------------\nStatus: ${statusText}${paymentInfo}\n\nAguardamos sua confirmação!`;
+    const discountText = sale.discount > 0 ? `\n📉 *Desconto:* R$ ${sale.discount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+
+    return `Olá ${customer?.name || sale.customerName || 'Cliente'}!\n\nSeu ${statusText} #${sale.orderNumber}.\n\n*ITENS:*\n${itemsText}\n\n------------------\n💰 *Subtotal:* R$ ${sale.subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${discountText}\n💎 *TOTAL: R$ ${sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*\n------------------\nStatus: ${statusText}${paymentInfo}\n\nAguardamos sua confirmação!`;
   };
 
   const handleCopyMessage = (sale: Sale) => {
@@ -161,6 +163,8 @@ export default function SalesView({
                 <button 
                   onClick={() => setShowFilters(!showFilters)}
                   className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 ${showFilters ? 'bg-orange-600 dark:bg-orange-600 text-white shadow-lg shadow-orange-600/40 animate-pulse' : 'text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-500/10 active:scale-95'}`}
+                  title="Filtrar Vendas"
+                  aria-label={showFilters ? "Fechar filtros" : "Abrir filtros"}
                 >
                   <Filter size={16} strokeWidth={2.5} />
                 </button>
@@ -172,6 +176,8 @@ export default function SalesView({
                     key={f}
                     onClick={() => setFilter(f)}
                     className={`px-2 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all flex items-center justify-center ${filter === f ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                    title={f === 'ALL' ? "Todas as Vendas" : f === 'RETAIL' ? "Vendas Varejo" : "Vendas Atacado"}
+                    aria-label={f === 'ALL' ? "Mostrar todas as vendas" : f === 'RETAIL' ? "Mostrar apenas varejo" : "Mostrar apenas atacado"}
                   >
                     {f === 'ALL' ? <Box size={14} /> : f === 'RETAIL' ? 'Varejo' : 'Atacado'}
                   </button>
@@ -185,6 +191,8 @@ export default function SalesView({
                   key={f}
                   onClick={() => setPaymentFilter(f)}
                   className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all flex items-center justify-center ${paymentFilter === f ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                  title={f === 'ALL' ? "Todos os Pagamentos" : f === 'PENDING' ? "Pagamentos Pendentes" : "Pagamentos Concluídos"}
+                  aria-label={f === 'ALL' ? "Mostrar todos os status de pagamento" : f === 'PENDING' ? "Mostrar apenas pendentes" : "Mostrar apenas concluídos"}
                 >
                   {f === 'ALL' ? 'Todos' : f === 'PENDING' ? 'Pendente' : 'Concluído'}
                 </button>
@@ -202,11 +210,15 @@ export default function SalesView({
               placeholder="Pesquisar por nome do cliente ou Nº do pedido..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              title="Pesquisar Vendas"
+              aria-label="Campo de pesquisa de vendas"
               className={`w-full h-14 pl-12 pr-4 rounded-2xl border text-[11px] font-bold uppercase tracking-widest transition-all outline-none focus:ring-2 focus:ring-indigo-600/20 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white placeholder:text-slate-600' : 'bg-white border-slate-100 text-slate-800 placeholder:text-slate-300'}`}
             />
             {searchQuery && (
               <button 
                 onClick={() => setSearchQuery('')}
+                title="Limpar Pesquisa"
+                aria-label="Limpar campo de pesquisa"
                 className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-white"
               >
                 <X size={16} strokeWidth={2.5} />
@@ -231,6 +243,8 @@ export default function SalesView({
                       setSelectedStatuses([...selectedStatuses, status.id]);
                     }
                   }}
+                  title={`Filtrar por ${status.label}`}
+                  aria-label={`${isActive ? 'Remover' : 'Incluir'} ${status.label} no filtro`}
                   className={`flex-none px-4 py-2.5 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-sm ${
                     isActive 
                       ? status.id === SaleStatus.SALE ? 'bg-indigo-600 border-indigo-600 text-white shadow-indigo-200' :
@@ -308,20 +322,20 @@ export default function SalesView({
                   <div className="flex flex-col">
                     <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Total</p>
                     <p className={`text-[12px] font-black tracking-tight ${sale.status === SaleStatus.CANCELLED ? 'text-slate-500' : 'text-indigo-600 dark:text-indigo-400'}`}>
-                      R$ {sale.total.toLocaleString('pt-BR')}
+                      R$ {sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
                   <div className="flex flex-col">
                     <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Pago</p>
                     <p className={`text-[12px] font-black tracking-tight ${totalPaid > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-700'}`}>
-                      R$ {totalPaid.toLocaleString('pt-BR')}
+                      R$ {totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
                   {remaining > 0 && sale.status === SaleStatus.SALE && (
                     <div className="flex flex-col">
                       <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Falta</p>
                       <p className="text-[12px] font-black text-rose-500 tracking-tight">
-                        R$ {remaining.toLocaleString('pt-BR')}
+                        R$ {remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                     </div>
                   )}
@@ -440,6 +454,8 @@ export default function SalesView({
                       onEdit(sale);
                     }}
                     className="w-9 h-9 flex items-center justify-center text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-white dark:hover:bg-slate-700 rounded-md transition-all active:scale-90"
+                    title="Editar Venda"
+                    aria-label="Editar detalhes da venda"
                   >
                     <Edit2 size={18} strokeWidth={2.5} />
                   </button>
@@ -449,6 +465,8 @@ export default function SalesView({
                       e.preventDefault();
                       setShowOptionsId(showOptionsId === sale.id ? null : sale.id);
                     }}
+                    title="Mais Opções"
+                    aria-label="Ver mais opções da venda"
                     className={`w-9 h-9 flex items-center justify-center rounded-md transition-all active:scale-90 ${showOptionsId === sale.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-indigo-600 hover:bg-white dark:hover:bg-slate-700'}`}
                   >
                     <MoreVertical size={18} strokeWidth={2.5} />
@@ -524,6 +542,8 @@ export default function SalesView({
 
       <button 
         onClick={onAdd}
+        title="Nova Venda"
+        aria-label="Criar nova venda"
         className={`fixed bottom-32 right-6 w-14 h-14 bg-slate-900 dark:bg-indigo-600 text-white rounded-[2rem] shadow-2xl flex items-center justify-center active:scale-95 transition-all z-20 border-4 border-white dark:border-slate-800 ${isDarkMode ? 'shadow-none' : 'shadow-slate-300'}`}
       >
          <Plus size={32} strokeWidth={2.5} />
@@ -543,6 +563,8 @@ export default function SalesView({
               <button 
                 onClick={() => setSelectedSale(null)}
                 className={`w-10 h-10 rounded-full flex items-center justify-center ${isDarkMode ? 'bg-slate-800 text-slate-400 hover:text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                title="Fechar Detalhes"
+                aria-label="Fechar modal de detalhes do pedido"
               >
                 <X size={20} />
               </button>
@@ -555,12 +577,16 @@ export default function SalesView({
                     <button 
                       onClick={() => handleShareWhatsApp(selectedSale)}
                       className="flex-[2] py-3 bg-emerald-500 text-white rounded-xl font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                      title="Compartilhar no WhatsApp"
+                      aria-label="Enviar detalhes do pedido para o WhatsApp do cliente"
                     >
                       <MessageSquare size={14} /> WhatsApp
                     </button>
                     <button 
                       onClick={() => setWhatsappMode(whatsappMode === 'AUTO' ? 'MANUAL' : 'AUTO')}
                       className={`flex-1 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all transition-colors flex items-center justify-center ${whatsappMode === 'AUTO' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-200 dark:bg-slate-700 text-slate-500 hover:text-indigo-600'}`}
+                      title="Alternar Modo WhatsApp"
+                      aria-label={`Alternar para modo ${whatsappMode === 'AUTO' ? 'Manual' : 'Automático'}`}
                     >
                       {whatsappMode === 'AUTO' ? 'AUTO' : 'M'}
                     </button>
@@ -568,6 +594,8 @@ export default function SalesView({
                   <button 
                     onClick={() => handleCopyMessage(selectedSale)}
                     className="flex-1 py-3 bg-slate-900 dark:bg-indigo-600 text-white rounded-2xl font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all"
+                    title="Copiar Pedido"
+                    aria-label="Copiar texto do pedido para a área de transferência"
                   >
                     <Copy size={14} /> Copiar
                   </button>
@@ -654,7 +682,12 @@ export default function SalesView({
                 <h2 className={`text-lg font-black uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Editar Mensagem</h2>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">WhatsApp para {editingMessage.sale.customerName || "Cliente"}</p>
               </div>
-              <button onClick={() => setEditingMessage(null)} className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-400">
+              <button 
+                onClick={() => setEditingMessage(null)} 
+                className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-400"
+                title="Fechar Edição"
+                aria-label="Fechar modal de edição de mensagem"
+              >
                 <X size={20} />
               </button>
             </div>
@@ -665,6 +698,8 @@ export default function SalesView({
                 value={editingMessage.text}
                 onChange={(e) => setEditingMessage({ ...editingMessage, text: e.target.value })}
                 placeholder="Escreva sua mensagem aqui..."
+                title="Editar Mensagem"
+                aria-label="Campo para editar a mensagem do WhatsApp"
               />
               
               <div className="mt-6 flex gap-3">
@@ -693,7 +728,12 @@ export default function SalesView({
           >
             <div className="p-6 flex items-center justify-between border-b border-slate-50 dark:border-slate-800">
                <h2 className={`text-lg font-black uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Observação</h2>
-               <button onClick={() => setNoteModal(null)} className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-400">
+               <button 
+                 onClick={() => setNoteModal(null)} 
+                 className="w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 dark:bg-slate-800 text-slate-400"
+                 title="Fechar Observação"
+                 aria-label="Fechar visualização de observação"
+               >
                  <X size={20} />
                </button>
             </div>

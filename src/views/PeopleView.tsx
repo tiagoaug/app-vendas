@@ -53,7 +53,7 @@ export default function PeopleView({ people, sales, purchases, transactions, onA
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 pb-32">
       <ConfirmDialog
         isOpen={isConfirmOpen}
         title="Excluir Cadastro?"
@@ -155,19 +155,25 @@ export default function PeopleView({ people, sales, purchases, transactions, onA
             <div className="flex gap-1 items-center">
               <button 
                 onClick={(e) => { e.stopPropagation(); setHistoryPerson(person); setIsHistoryModalOpen(true); }} 
-                className="p-2 text-rose-500 animate-pulse hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100"
+                className="p-2 text-rose-500 hover:text-rose-600 transition-colors"
+                title="Histórico de Pagamentos"
+                aria-label="Histórico de Pagamentos"
               >
                 <History size={18} strokeWidth={2.5} />
               </button>
                <button 
                 onClick={(e) => { e.stopPropagation(); setEditingPerson(person); setIsModalOpen(true); }} 
-                className="p-2 text-slate-300 dark:text-slate-600 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors opacity-0 group-hover:opacity-100"
+                className="p-2 text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                title="Editar Cadastro"
+                aria-label="Editar Cadastro"
               >
                 <Edit size={18} strokeWidth={2.5} />
               </button>
-              <button 
+               <button 
                 onClick={(e) => { e.stopPropagation(); handleDeleteClick(person.id); }} 
-                className="p-2 text-slate-300 dark:text-slate-600 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                className="p-2 text-slate-400 dark:text-slate-500 hover:text-rose-500 transition-colors"
+                title="Excluir Cadastro"
+                aria-label="Excluir Cadastro"
               >
                 <Trash2 size={18} strokeWidth={2.5} />
               </button>
@@ -187,6 +193,8 @@ export default function PeopleView({ people, sales, purchases, transactions, onA
       <button 
         onClick={() => { setEditingPerson(null); setIsModalOpen(true); }}
         className={`fixed bottom-32 right-6 w-14 h-14 bg-slate-900 dark:bg-indigo-600 text-white rounded-[2rem] shadow-2xl flex items-center justify-center active:scale-95 transition-all z-20 border-4 border-white dark:border-slate-800 ${isDarkMode ? 'shadow-none' : 'shadow-slate-300'}`}
+        title="Novo Cadastro"
+        aria-label="Novo Cadastro"
       >
         <Plus size={32} strokeWidth={3} />
       </button>

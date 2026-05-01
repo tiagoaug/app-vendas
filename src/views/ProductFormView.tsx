@@ -101,7 +101,12 @@ export default function ProductFormView({ productId, products, grids, suppliers,
 
     return (
       <div className="flex flex-col gap-6 pb-60 pt-4 min-h-screen animate-in slide-in-from-right duration-300">
-        <button onClick={() => setActiveVariationIndex(null)} className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
+        <button 
+          onClick={() => setActiveVariationIndex(null)} 
+          className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400 mb-2"
+          aria-label="Voltar para a edição do produto"
+          title="Voltar para o Produto"
+        >
           <ChevronLeft size={16} /> Voltar para o Produto
         </button>
 
@@ -116,6 +121,8 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                 <select 
                   className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-3 py-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500/10 text-slate-800 dark:text-slate-100"
                   value={v.colorName}
+                  aria-label="Selecionar cor da variação"
+                  title="Selecionar Cor"
                   onChange={(e) => {
                     const selectedColor = colors.find(c => c.name === e.target.value);
                     if (selectedColor) {
@@ -141,6 +148,8 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                  type="number"
                  className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-2 py-2 text-xs font-bold focus:ring-2 focus:ring-indigo-500/10 text-slate-800 dark:text-slate-100 text-center"
                  value={v.minStock || 0}
+                 aria-label="Estoque mínimo da variação"
+                 title="Estoque Mínimo"
                  onChange={(e) => {
                    updateVariation(activeVariationIndex, { minStock: parseInt(e.target.value) || 0 });
                  }}
@@ -179,6 +188,7 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                             <p className="text-[7px] font-bold text-slate-400 uppercase mb-0.5">Custo (Par)</p>
                             <input 
                               type="number"
+                              step="0.01"
                               className="w-full bg-white dark:bg-slate-900 border-none rounded-md p-1.5 text-center text-[10px] font-bold"
                               value={v.sizePrices?.[size]?.cost ?? costPrice}
                               onChange={(e) => {
@@ -195,6 +205,7 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                             <p className="text-[7px] font-bold text-slate-400 uppercase mb-0.5">Venda (Par)</p>
                             <input 
                               type="number"
+                              step="0.01"
                               className="w-full bg-white dark:bg-slate-900 border-none rounded-md p-1.5 text-center text-[10px] font-bold text-indigo-600"
                               value={v.sizePrices?.[size]?.sale ?? salePrice}
                               onChange={(e) => {
@@ -235,7 +246,8 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                   <div className="relative">
                     <input 
                       type="number"
-                      placeholder="0"
+                      placeholder="Estoque Total"
+                      title="Estoque Total"
                       className="w-full bg-white dark:bg-slate-900 border-2 border-amber-100 dark:border-amber-900/30 rounded-2xl px-5 py-4 text-sm font-black text-slate-900 dark:text-white shadow-inner focus:border-amber-500 focus:ring-0 transition-all"
                       value={v.stock['WHOLESALE'] !== undefined ? v.stock['WHOLESALE'] : ''}
                       onChange={(e) => {
@@ -267,6 +279,8 @@ export default function ProductFormView({ productId, products, grids, suppliers,
             }
           }}
           className={`bg-indigo-600 text-white py-4 rounded-xl font-black uppercase tracking-widest text-xs shadow-lg flex items-center justify-center gap-2 ${isDarkMode ? 'shadow-none' : 'shadow-indigo-200'}`}
+          aria-label="Confirmar esta variação e passar para a próxima"
+          title="Próxima Variação"
         >
           Confirmar e Próxima Variação <ChevronRight size={16}/>
         </button>
@@ -306,6 +320,8 @@ export default function ProductFormView({ productId, products, grids, suppliers,
              type="button"
              onClick={() => setStatus(status === ProductStatus.ACTIVE ? ProductStatus.INACTIVE : ProductStatus.ACTIVE)}
              className={`w-12 h-6 rounded-full relative transition-colors ${status === ProductStatus.ACTIVE ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+             aria-label={status === ProductStatus.ACTIVE ? "Inativar produto" : "Ativar produto"}
+             title={status === ProductStatus.ACTIVE ? "Inativar" : "Ativar"}
            >
              <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${status === ProductStatus.ACTIVE ? 'left-7' : 'left-1'}`} />
            </button>
@@ -359,12 +375,23 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                  <div className="relative">
                    <input 
                      type="number" 
+                     step="0.01"
                      className={`w-full border-2 rounded-2xl px-6 py-4.5 pl-12 text-sm font-black transition-all outline-none focus:ring-0 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500' : 'bg-white border-slate-100 text-slate-900 focus:border-indigo-500'}`}
                      value={costPrice}
+                     aria-label="Preço de custo"
+                     title="Preço de Custo"
                      onChange={(e) => setCostPrice(e.target.value)}
                    />
                    <DollarSign size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" />
-                   <button type="button" onClick={() => setCalcModal({ isOpen: true, field: 'costPrice', value: parseFloat(costPrice as string) || 0 })} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-all"><Calculator size={16} /></button>
+                   <button 
+                     type="button" 
+                     onClick={() => setCalcModal({ isOpen: true, field: 'costPrice', value: parseFloat(costPrice as string) || 0 })} 
+                     className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-all"
+                     aria-label="Abrir calculadora para o preço de custo"
+                     title="Calculadora"
+                   >
+                     <Calculator size={16} />
+                   </button>
                  </div>
                </div>
 
@@ -375,12 +402,23 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                  <div className="relative">
                    <input 
                      type="number" 
+                     step="0.01"
                      className={`w-full border-2 rounded-2xl px-6 py-4.5 pl-12 text-sm font-black transition-all outline-none focus:ring-0 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-indigo-400 focus:border-indigo-500 text-lg' : 'bg-white border-slate-100 text-indigo-600 focus:border-indigo-500 text-lg'}`}
                      value={salePrice}
+                     aria-label="Preço de venda"
+                     title="Preço de Venda"
                      onChange={(e) => setSalePrice(e.target.value)}
                    />
                    <DollarSign size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-indigo-400" />
-                   <button type="button" onClick={() => setCalcModal({ isOpen: true, field: 'salePrice', value: parseFloat(salePrice as string) || 0 })} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-all"><Calculator size={16} /></button>
+                   <button 
+                     type="button" 
+                     onClick={() => setCalcModal({ isOpen: true, field: 'salePrice', value: parseFloat(salePrice as string) || 0 })} 
+                     className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded-xl transition-all"
+                     aria-label="Abrir calculadora para o preço de venda"
+                     title="Calculadora"
+                   >
+                     <Calculator size={16} />
+                   </button>
                  </div>
                </div>
 
@@ -415,6 +453,8 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                       type="number" 
                       className={`w-full border-2 rounded-2xl px-6 py-4.5 pl-12 text-sm font-black transition-all outline-none focus:ring-0 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white focus:border-indigo-500' : 'bg-white border-slate-100 text-slate-900 focus:border-indigo-500'}`}
                       value={minStockInBoxes}
+                      aria-label="Estoque mínimo global"
+                      title="Estoque Mínimo"
                       onChange={(e) => setMinStockInBoxes(e.target.value)}
                     />
                     <Package size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -491,13 +531,22 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                     <div className="relative">
                         <input 
                         type="number"
+                        step="0.01"
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl px-3 py-3 text-[10px] font-bold text-slate-900 dark:text-slate-100 pl-8"
                         value={costPriceAdjustmentAmount}
                         onChange={(e) => setCostPriceAdjustmentAmount(e.target.value)}
                         placeholder="0.00"
                         />
                         <DollarSign size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <button type="button" onClick={() => setCalcModal({ isOpen: true, field: 'costPriceAdjustmentAmount', value: parseFloat(costPriceAdjustmentAmount as string) || 0 })} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600"><Calculator size={12} /></button>
+                        <button 
+                          type="button" 
+                          onClick={() => setCalcModal({ isOpen: true, field: 'costPriceAdjustmentAmount', value: parseFloat(costPriceAdjustmentAmount as string) || 0 })} 
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600"
+                          title="Calculadora"
+                          aria-label="Abrir calculadora para reajuste de custo"
+                        >
+                          <Calculator size={12} />
+                        </button>
                     </div>
                 </div>
                 <div>
@@ -505,13 +554,22 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                     <div className="relative">
                         <input 
                         type="number"
+                        step="0.01"
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl px-3 py-3 text-[10px] font-bold text-slate-900 dark:text-slate-100 pl-8"
                         value={salePriceAdjustmentAmount}
                         onChange={(e) => setSalePriceAdjustmentAmount(e.target.value)}
                         placeholder="0.00"
                         />
                         <DollarSign size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400" />
-                        <button type="button" onClick={() => setCalcModal({ isOpen: true, field: 'salePriceAdjustmentAmount', value: parseFloat(salePriceAdjustmentAmount as string) || 0 })} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600"><Calculator size={12} /></button>
+                        <button 
+                          type="button" 
+                          onClick={() => setCalcModal({ isOpen: true, field: 'salePriceAdjustmentAmount', value: parseFloat(salePriceAdjustmentAmount as string) || 0 })} 
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600"
+                          title="Calculadora"
+                          aria-label="Abrir calculadora para reajuste de venda"
+                        >
+                          <Calculator size={12} />
+                        </button>
                     </div>
                 </div>
               </div>
@@ -522,7 +580,12 @@ export default function ProductFormView({ productId, products, grids, suppliers,
       <section>
           <div className="flex items-center justify-between mb-4 px-1">
             <h3 className="text-[11px] font-extrabold uppercase tracking-widest text-slate-900 dark:text-slate-100">Cores e Variações</h3>
-            <button onClick={addVariation} className="flex items-center gap-2 text-[10px] bg-indigo-600 text-white px-4 py-2 rounded-xl font-black uppercase tracking-widest hover:bg-indigo-700 shadow-sm transition-all">
+            <button 
+              onClick={addVariation} 
+              className="flex items-center gap-2 text-[10px] bg-indigo-600 text-white px-4 py-2 rounded-xl font-black uppercase tracking-widest hover:bg-indigo-700 shadow-sm transition-all"
+              aria-label="Adicionar nova variação de cor"
+              title="Adicionar Cor"
+            >
               <Plus size={14} strokeWidth={3} /> Adicionar Cor
             </button>
           </div>
@@ -539,8 +602,22 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setActiveVariationIndex(i)} className="p-2 text-slate-400 dark:text-slate-600 hover:text-indigo-600 transition-colors"><ChevronRight size={18} /></button>
-                  <button onClick={() => deleteVariation(i)} className="p-2 text-rose-300 dark:text-rose-700 hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>
+                  <button 
+                    onClick={() => setActiveVariationIndex(i)} 
+                    className="p-2 text-slate-400 dark:text-slate-600 hover:text-indigo-600 transition-colors"
+                    aria-label={`Editar variação ${v.colorName}`}
+                    title="Editar Variação"
+                  >
+                    <ChevronRight size={18} />
+                  </button>
+                  <button 
+                    onClick={() => deleteVariation(i)} 
+                    className="p-2 text-rose-300 dark:text-rose-700 hover:text-rose-500 transition-colors"
+                    aria-label={`Excluir variação ${v.colorName}`}
+                    title="Excluir Variação"
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
               </div>
             ))}
@@ -563,6 +640,8 @@ export default function ProductFormView({ productId, products, grids, suppliers,
         <button 
           onClick={handleSave}
           className={`bg-slate-900 dark:bg-indigo-600 text-white py-3.5 rounded-xl font-bold uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 shadow-xl transform transition-transform active:scale-95 cursor-pointer ${isDarkMode ? 'shadow-none' : 'shadow-slate-200'}`}
+          aria-label="Salvar alterações do produto"
+          title="Salvar Produto"
         >
           <Save size={14} /> Salvar Produto
         </button>

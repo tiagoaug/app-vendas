@@ -346,14 +346,16 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
       const sizeDesc = item.size ? ` (TAM ${item.size})` : '';
       const typeDesc = item.saleType === SaleType.RETAIL ? 'pares' : 'grades';
       
-      return `📦 *${p?.name}${variantDesc}*${sizeDesc}\n   Qtd: ${item.quantity} ${typeDesc}\n   Un: R$ ${item.price.toLocaleString('pt-BR')}\n   Sub: R$ ${(item.price * item.quantity).toLocaleString('pt-BR')}`;
+      return `📦 *${p?.name}${variantDesc}*${sizeDesc}\n   Qtd: ${item.quantity} ${typeDesc}\n   Un: R$ ${item.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n   Sub: R$ ${(item.price * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }).join('\n\n');
 
     const paymentMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
-    const paymentInfo = paymentMethod?.value ? `\n\n💳 *Pagamento: ${paymentMethod.name}*\nRef: ${paymentMethod.value}` : `\n\n💳 *Pagamento: ${paymentMethod?.name || 'A definir'}*`;
+    const paymentInfo = paymentMethod?.value ? `\n\n💳 *Pagamento: ${paymentMethod.name}*\nchave pix: ${paymentMethod.value}` : `\n\n💳 *Pagamento: ${paymentMethod?.name || 'A definir'}*`;
 
     const statusText = status === SaleStatus.QUOTE ? 'ORÇAMENTO' : 'PEDIDO';
-    return `Olá ${customer?.name || 'Cliente'}!\n\nSeu ${statusText} #${orderNumber} na Calçados.\n\n*ITENS:*\n${itemsText}\n\n------------------\n💰 *Subtotal:* R$ ${subtotal.toLocaleString('pt-BR')}\n📉 *Desconto:* R$ ${discount.toLocaleString('pt-BR')}\n💎 *TOTAL: R$ ${total.toLocaleString('pt-BR')}*\n------------------\nStatus: ${statusText}${paymentInfo}\n\nAguardamos sua confirmação!`;
+    const discountText = discount > 0 ? `\n📉 *Desconto:* R$ ${discount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+
+    return `Olá ${customer?.name || 'Cliente'}!\n\nSeu ${statusText} #${orderNumber}.\n\n*ITENS:*\n${itemsText}\n\n------------------\n💰 *Subtotal:* R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${discountText}\n💎 *TOTAL: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*\n------------------\nStatus: ${statusText}${paymentInfo}\n\nAguardamos sua confirmação!`;
   };
 
   const handleWhatsApp = () => {
@@ -441,8 +443,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
       return [
         { content: `${p?.name}${variantDesc}${sizeDesc}`, styles: { fontStyle: 'bold' } },
         item.quantity,
-        `R$ ${item.price.toLocaleString('pt-BR')}`,
-        `R$ ${(item.price * item.quantity).toLocaleString('pt-BR')}`
+        `R$ ${item.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `R$ ${(item.price * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       ];
     });
 
@@ -501,9 +503,9 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
     doc.text('Desconto Aplicado:', 150, finalY + 18, { align: 'right' });
     
     doc.setTextColor(15, 23, 42);
-    doc.text(`R$ ${subtotal.toLocaleString('pt-BR')}`, 190, finalY + 10, { align: 'right' });
+    doc.text(`R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 190, finalY + 10, { align: 'right' });
     doc.setTextColor(225, 29, 72);
-    doc.text(`- R$ ${discount.toLocaleString('pt-BR')}`, 190, finalY + 18, { align: 'right' });
+    doc.text(`- R$ ${discount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 190, finalY + 18, { align: 'right' });
     
     doc.setFillColor(15, 23, 42);
     doc.rect(130, finalY + 25, 60, 12, 'F');
@@ -512,7 +514,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.text('VALOR FINAL', 135, finalY + 33);
-    doc.text(`R$ ${total.toLocaleString('pt-BR')}`, 185, finalY + 33, { align: 'right' });
+    doc.text(`R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 185, finalY + 33, { align: 'right' });
 
     // Legal
     doc.setTextColor(148, 163, 184);
@@ -538,11 +540,14 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                     type="checkbox"
                     className="sr-only"
                     checked={isAutoOrderNumber}
+                    aria-label="Gerar número de pedido automático"
                     onChange={() => {
                       const newAuto = !isAutoOrderNumber;
                       setIsAutoOrderNumber(newAuto);
                       if (newAuto) {
                         setOrderNumber(Math.floor(Math.random() * 10000).toString().padStart(5, '0'));
+                      } else {
+                        setOrderNumber('');
                       }
                     }}
                   />
@@ -559,6 +564,9 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                   type="text"
                   className={`text-[10px] bg-transparent border-b border-transparent focus:border-indigo-500 outline-none font-bold uppercase tracking-widest min-w-0 w-16 ${isAutoOrderNumber ? 'text-slate-400' : 'text-indigo-500'}`}
                   value={orderNumber}
+                  aria-label="Número do pedido"
+                  title="Número do Pedido"
+                  placeholder="00000"
                   onChange={(e) => {
                     setOrderNumber(e.target.value);
                     setIsAutoOrderNumber(false);
@@ -574,12 +582,16 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
            <button 
              onClick={() => setStatus(SaleStatus.SALE)}
              className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${status === SaleStatus.SALE ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-lg' : 'text-slate-400'}`}
+             aria-label="Definir como venda"
+             title="Venda"
            >
              Venda
            </button>
            <button 
              onClick={() => setStatus(SaleStatus.QUOTE)}
              className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${status === SaleStatus.QUOTE ? 'bg-amber-500 text-white shadow-lg' : 'text-slate-400'}`}
+             aria-label="Definir como orçamento"
+             title="Orçamento"
            >
              Orc.
            </button>
@@ -606,6 +618,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                 <select 
                   className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-4 text-[11px] font-black uppercase appearance-none text-slate-700 dark:text-slate-200"
                   value={paymentTerm}
+                  aria-label="Condição de pagamento"
+                  title="Condição de Pagamento"
                   onChange={(e) => setPaymentTerm(e.target.value as PaymentTerm)}
                 >
                   <option value={PaymentTerm.CASH}>À Vista</option>
@@ -618,6 +632,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                   <select 
                     className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-4 text-[11px] font-black uppercase appearance-none text-slate-700 dark:text-slate-200 cursor-pointer pr-10"
                     value={paymentMethodId}
+                    aria-label="Método de pagamento"
+                    title="Método de Pagamento"
                     onChange={(e) => setPaymentMethodId(e.target.value)}
                   >
                     <option value="">SELECIONE O MÉTODO</option>
@@ -635,6 +651,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                   <select 
                     className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-4 text-[11px] font-black uppercase appearance-none text-slate-700 dark:text-slate-200 cursor-pointer pr-10"
                     value={paymentStatus}
+                    aria-label="Status do pagamento"
+                    title="Status do Pagamento"
                     onChange={(e) => setPaymentStatus(e.target.value as PaymentStatus)}
                   >
                     <option value={PaymentStatus.PENDING}>Pendente</option>
@@ -651,6 +669,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                       type="date"
                       className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-4 text-[11px] font-black uppercase appearance-none text-slate-700 dark:text-slate-200 cursor-pointer"
                       value={dueDate}
+                      aria-label="Data de vencimento"
+                      title="Data de Vencimento"
                       onChange={(e) => setDueDate(e.target.value)}
                     />
                     <Calendar size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
@@ -665,10 +685,12 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                 <select 
                   className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-4 text-[11px] font-black uppercase appearance-none text-slate-700 dark:text-slate-200 cursor-pointer pr-10"
                   value={accountId}
+                  aria-label="Conta de destino"
+                  title="Conta de Destino"
                   onChange={(e) => setAccountId(e.target.value)}
                 >
                   <option value="">SELECIONE A CONTA</option>
-                  {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} (SALDO: R$ {acc.balance.toLocaleString('pt-BR')})</option>)}
+                  {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name} (SALDO: R$ {acc.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})</option>)}
                 </select>
                 <Wallet size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
              </div>
@@ -679,6 +701,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
               <textarea 
                 className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-5 py-4 text-[12px] font-medium leading-relaxed outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-700 dark:text-slate-200 resize-none h-24"
                 value={notes}
+                aria-label="Observações da venda"
+                title="Observações"
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Adicione observações sobre a venda..."
               />
@@ -693,7 +717,12 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                <h3 className="text-[11px] font-black uppercase tracking-[0.15em] text-slate-400 leading-none">Cesta de Itens</h3>
                <p className="text-[8px] text-slate-300 font-bold uppercase tracking-widest mt-1">Selecione os produtos e variações</p>
             </div>
-            <button onClick={() => setShowProductModal(true)} className={`flex items-center gap-2 font-black text-[10px] uppercase tracking-widest bg-slate-900 dark:bg-indigo-600 text-white px-5 py-3 rounded-2xl shadow-xl active:scale-95 transition-all`}>
+            <button 
+              onClick={() => setShowProductModal(true)} 
+              className={`flex items-center gap-2 font-black text-[10px] uppercase tracking-widest bg-slate-900 dark:bg-indigo-600 text-white px-5 py-3 rounded-2xl shadow-xl active:scale-95 transition-all`}
+              aria-label="Adicionar modelo à cesta"
+              title="Adicionar Modelo"
+            >
               <Plus size={14} strokeWidth={3} /> Modelo
             </button>
         </div>
@@ -729,10 +758,20 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                    </div>
                    
                    <div className="flex items-center gap-2">
-                     <button onClick={() => toggleBlockExpanded(block.id)} className="p-2 text-slate-300 dark:text-slate-600 hover:text-indigo-500 transition-colors transform active:scale-90">
+                     <button 
+                       onClick={() => toggleBlockExpanded(block.id)} 
+                       className="p-2 text-slate-300 dark:text-slate-600 hover:text-indigo-500 transition-colors transform active:scale-90"
+                       aria-label="Expandir/Recolher item"
+                       title="Ver Detalhes"
+                     >
                        {isExpanded ? <ChevronUp size={20} strokeWidth={2.5} /> : <ChevronDown size={20} strokeWidth={2.5} />}
                      </button>
-                     <button onClick={() => removeBlock(index)} className="p-2 text-slate-200 dark:text-slate-700 hover:text-rose-500 transition-colors transform active:scale-90">
+                     <button 
+                       onClick={() => removeBlock(index)} 
+                       className="p-2 text-slate-200 dark:text-slate-700 hover:text-rose-500 transition-colors transform active:scale-90"
+                       aria-label="Remover item da cesta"
+                       title="Remover"
+                     >
                        <Trash2 size={18} strokeWidth={2.5} />
                      </button>
                    </div>
@@ -764,6 +803,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                               });
                             }}
                             className={`text-[9px] font-black py-3 rounded-2xl border-2 uppercase tracking-widest transition-all ${block.saleType === SaleType.WHOLESALE ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-slate-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-900/50'}`}
+                            aria-label="Mudar modalidade de venda"
+                            title="Modalidade"
                           >
                             {block.saleType === SaleType.WHOLESALE ? 'Atacado' : 'Varejo'}
                           </button>
@@ -778,8 +819,11 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                         <label className="text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-widest px-1">Preço Base</label>
                         <input 
                           type="number"
+                          step="0.01"
                           className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl py-3 text-right pr-4 text-[13px] font-black text-indigo-600 dark:text-indigo-400 focus:ring-4 focus:ring-indigo-500/5 transition-all"
                           value={block.price}
+                          aria-label="Preço base do item"
+                          title="Preço Base"
                           onChange={(e) => {
                             const newPrice = parseFloat(e.target.value) || 0;
                             // Update all variations that use the base price? 
@@ -866,6 +910,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                                 <label className="text-[7px] font-black text-slate-400 uppercase">Preço</label>
                                 <input 
                                   type="number" 
+                                  step="0.01"
                                   className="w-16 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg py-1 px-2 text-[10px] font-black text-right"
                                   value={varState.price}
                                   onChange={(e) => updateVariation(index, v.id, varState.quantity, parseFloat(e.target.value) || 0)}
@@ -925,11 +970,11 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
               <div className="grid grid-cols-2 gap-3">
                  <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
                     <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Pago</p>
-                    <p className="text-sm font-black text-emerald-500">R$ {amountPaid.toLocaleString('pt-BR')}</p>
+                    <p className="text-sm font-black text-emerald-500">R$ {amountPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                  </div>
                  <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
                     <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Restante</p>
-                    <p className={`text-sm font-black ${remainingBalance > 0 ? 'text-rose-500' : 'text-slate-400'}`}>R$ {remainingBalance.toLocaleString('pt-BR')}</p>
+                    <p className={`text-sm font-black ${remainingBalance > 0 ? 'text-rose-500' : 'text-slate-400'}`}>R$ {remainingBalance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                  </div>
               </div>
 
@@ -947,7 +992,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                                 {payment.note && <p className="text-[7px] text-indigo-400 italic mt-0.5">"{payment.note}"</p>}
                              </div>
                              <div className="flex items-center gap-3">
-                                <span className="text-[10px] font-black text-emerald-500">R$ {payment.amount.toLocaleString('pt-BR')}</span>
+                                <span className="text-[10px] font-black text-emerald-500">R$ {payment.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                                 <button 
                                   onClick={() => setPaymentHistory(paymentHistory.filter(p => p.id !== payment.id))}
                                   className="p-1 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all"
@@ -966,7 +1011,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                 <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 flex items-center gap-2">
                    <Info size={12} className="text-amber-500" />
                    <p className="text-[8px] font-bold text-amber-700 dark:text-amber-400 leading-tight uppercase tracking-widest">
-                     O valor pago excede o total. O cliente terá um crédito de <span className="font-black">R$ {surplusCredit.toLocaleString('pt-BR')}</span>.
+                     O valor pago excede o total. O cliente terá um crédito de <span className="font-black">R$ {surplusCredit.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>.
                    </p>
                 </div>
               )}
@@ -978,7 +1023,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
            <div className="flex justify-between items-start px-1">
               <div>
                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none mb-2">Resumo Geral</p>
-                 <h3 className={`text-4xl font-black italic tracking-tighter ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>R$ {total.toLocaleString('pt-BR')}</h3>
+                 <h3 className={`text-4xl font-black italic tracking-tighter ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h3>
                  <p className="text-[9px] text-emerald-500 font-bold uppercase tracking-widest mt-3 flex items-center gap-1.5 leading-none">
                     <CheckCircle2 size={10} /> {status === SaleStatus.SALE ? 'Venda Pronta' : 'Orçamento Gerado'}
                  </p>
@@ -994,8 +1039,12 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                  <div className="relative">
                     <input 
                       type="number" 
+                      step="0.01"
                       className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl py-3 pl-3 pr-8 text-xs font-black text-rose-500"
                       value={discount}
+                      title="Desconto"
+                      aria-label="Valor do desconto"
+                      placeholder="0.00"
                       onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
                     />
                     <Percent size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300" />
@@ -1067,6 +1116,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                <textarea 
                  className={`flex-1 w-full bg-slate-50 dark:bg-slate-800/30 border-2 border-slate-100 dark:border-slate-800 rounded-[2rem] p-6 text-sm font-medium leading-relaxed resize-none focus:ring-8 focus:ring-indigo-500/5 outline-none transition-all ${isDarkMode ? 'text-slate-200' : 'text-slate-700'}`}
                  value={whatsappMessage}
+                 title="Mensagem do WhatsApp"
+                 aria-label="Conteúdo da mensagem para WhatsApp"
                  onChange={(e) => {
                    setWhatsappMessage(e.target.value);
                    setIsMessageManual(true);
@@ -1181,26 +1232,33 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
 
             <div className="p-6 flex flex-col gap-5">
                <div>
-                  <label className="text-[9px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 mb-2 block tracking-widest">Valor Recebido</label>
+                  <div className="flex items-center justify-between px-3 mb-2">
+                    <label className="text-[9px] uppercase font-black text-slate-400 dark:text-slate-500 block tracking-widest">Valor Recebido</label>
+                    {remainingBalance > 0 && (
+                      <button 
+                        type="button"
+                        onClick={() => setPartialPaymentAmount(remainingBalance)}
+                        className="text-[8px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-600 flex items-center gap-1"
+                      >
+                        <CheckCircle2 size={10} />
+                        Quitar Total
+                      </button>
+                    )}
+                  </div>
                   <div className="relative">
                     <input 
                       type="number" 
+                      step="0.01"
                       autoFocus
                       className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-5 py-4 text-lg font-black text-emerald-500 placeholder:text-slate-300 outline-none focus:ring-4 focus:ring-emerald-500/5 transition-all"
                       placeholder="0.00"
                       value={partialPaymentAmount || ''}
+                      title="Valor Recebido"
+                      aria-label="Valor recebido no pagamento parcial"
                       onChange={(e) => setPartialPaymentAmount(parseFloat(e.target.value) || 0)}
                     />
                     <div className="absolute right-5 top-1/2 -translate-y-1/2 text-sm font-black text-slate-300">R$</div>
                   </div>
-                  {remainingBalance > 0 && (
-                    <button 
-                      onClick={() => setPartialPaymentAmount(remainingBalance)}
-                      className="mt-2 ml-2 text-[8px] font-black uppercase tracking-widest text-indigo-500 hover:text-indigo-600"
-                    >
-                      Receber valor total (R$ {remainingBalance.toLocaleString('pt-BR')})
-                    </button>
-                  )}
                </div>
 
                <div className="grid grid-cols-2 gap-3">
@@ -1235,6 +1293,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                     placeholder="Ex: Pago via PIX pelo João"
                     className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl px-5 py-4 text-[12px] font-bold text-slate-700 dark:text-slate-200"
                     value={partialPaymentNote}
+                    title="Observação do Recebimento"
+                    aria-label="Observação sobre o pagamento parcial"
                     onChange={(e) => setPartialPaymentNote(e.target.value)}
                   />
                </div>
@@ -1254,7 +1314,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
       <div className="mt-6 mx-2 flex flex-col xl:flex-row xl:items-center justify-between bg-slate-900 dark:bg-slate-800 p-4 rounded-[2rem] shadow-xl z-40 animate-in slide-in-from-bottom-5 gap-4 pointer-events-auto">
          <div className="pl-3">
             <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest leading-none mb-1">Finalizar {status === SaleStatus.QUOTE ? 'Orçamento' : 'Venda'}</p>
-            <p className="text-2xl font-black text-white leading-none">R$ {total.toLocaleString('pt-BR')}</p>
+            <p className="text-2xl font-black text-white leading-none">R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
          </div>
          <div className="flex gap-2 w-full xl:w-auto">
             {saleId && (
@@ -1373,7 +1433,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
              
              <div className="w-full p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Total da Venda</p>
-                <p className="text-xl font-black text-indigo-600 dark:text-indigo-400 italic">R$ {total.toLocaleString('pt-BR')}</p>
+                <p className="text-xl font-black text-indigo-600 dark:text-indigo-400 italic">R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
              </div>
 
              <button 

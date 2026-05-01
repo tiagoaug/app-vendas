@@ -1889,10 +1889,18 @@ export default function App() {
           </h1>
         </div>
         <div className="flex items-center gap-3 text-slate-500">
-          <button onClick={() => setIsDarkMode(!isDarkMode)}>
+          <button 
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            title={isDarkMode ? "Mudar para modo claro" : "Mudar para modo escuro"}
+            aria-label={isDarkMode ? "Mudar para modo claro" : "Mudar para modo escuro"}
+          >
             <Moon size={20} />
           </button>
-          <button onClick={logout}>
+          <button 
+            onClick={logout}
+            title="Sair do aplicativo"
+            aria-label="Sair do aplicativo"
+          >
             <LogOut size={20} />
           </button>
         </div>

@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { Transaction, TransactionType, Category, Account, AccountType, Person, Purchase, PaymentStatus, PurchaseType, PaymentTerm, PaymentHistory, Sale, Product } from '../types';
-import { Search, Plus, TrendingUp, TrendingDown, DollarSign, Calendar, Wallet, User, Trash2, Edit, CheckCircle2, AlertCircle, Clock, RefreshCcw, ClipboardCheck, Package, History, Clipboard } from 'lucide-react';
+import { Search, Plus, TrendingUp, TrendingDown, DollarSign, Calendar, Wallet, User, Trash2, Edit, CheckCircle2, AlertCircle, Clock, RefreshCcw, ClipboardCheck, Package, History, Clipboard, Hash } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import TransactionModal from '../components/TransactionModal';
@@ -147,13 +147,13 @@ export default function FinancialView({
 
     const supplier = people.find(s => s.id === purchase.supplierId);
     const text = purchase.paymentHistory
-      .map(p => `${format(p.date, 'dd/MM/yyyy')} - R$ ${p.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
+      .map(p => `${format(p.date, 'dd/MM/yyyy')} - R$ ${p.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
       .join('\n');
     
     const totalPaid = purchase.paymentHistory.reduce((acc, p) => acc + p.amount, 0);
     const remaining = Math.max(0, purchase.total - totalPaid);
 
-    const summary = `Histórico de Pagamentos - Compra #${purchase.id.slice(-6).toUpperCase()}\nFornecedor: ${supplier?.name || '---'}\nTotal: R$ ${purchase.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n\n${text}\n\nTotal Pago: R$ ${totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\nRestante: R$ ${remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+    const summary = `Histórico de Pagamentos - Compra #${purchase.id.slice(-6).toUpperCase()}\nFornecedor: ${supplier?.name || '---'}\nTotal: R$ ${purchase.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n\n${text}\n\nTotal Pago: R$ ${totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\nRestante: R$ ${remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
     navigator.clipboard.writeText(summary);
     alert('Histórico de pagamentos copiado!');
@@ -204,7 +204,7 @@ export default function FinancialView({
       const overpaid = totalPaid - selectedPurchase.total;
       const currentCredit = supplier.credit || 0;
       await onUpdatePerson(supplier.id, { credit: currentCredit + overpaid });
-      alert(`Sobrepagamento de R$ ${overpaid.toLocaleString('pt-BR')} adicionado como crédito ao fornecedor!`);
+      alert(`Sobrepagamento de R$ ${overpaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} adicionado como crédito ao fornecedor!`);
     }
   };
 
@@ -266,6 +266,8 @@ export default function FinancialView({
         onClose={() => setIsQueryModalOpen(false)}
         people={people}
         transactions={transactions}
+        purchases={purchases}
+        sales={sales}
         onSettle={handleSettle}
         isDarkMode={isDarkMode}
       />
@@ -311,16 +313,16 @@ export default function FinancialView({
                 </button>
              </div>
              <p className={`text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-indigo-100'}`}>Saldo Confirmado</p>
-             <h2 className={`text-3xl font-black mt-2 tracking-tighter ${isDarkMode ? 'text-white' : 'text-white'}`}>R$ {stats.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
+             <h2 className={`text-3xl font-black mt-2 tracking-tighter ${isDarkMode ? 'text-white' : 'text-white'}`}>R$ {stats.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</h2>
              
              <div className="flex gap-4 mt-6">
                 <div className="flex-1">
                    <p className={`text-[8px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-indigo-200'}`}>Receitas</p>
-                   <p className="text-sm font-bold text-emerald-400">R$ {stats.income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                   <p className="text-sm font-bold text-emerald-400">R$ {stats.income.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
                 <div className="flex-1">
                    <p className={`text-[8px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-indigo-200'}`}>Despesas</p>
-                   <p className="text-sm font-bold text-rose-400">R$ {stats.expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                   <p className="text-sm font-bold text-rose-400">R$ {stats.expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
              </div>
           </div>
@@ -428,18 +430,19 @@ export default function FinancialView({
                              </h3>
                              {totalPaid > 0 && <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-500">Parcial</span>}
                           </div>
-                          <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                            <User size={10} /> {supplier?.name || 'Fornecedor Desconhecido'}
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                            <span className="flex items-center gap-1"><User size={10} /> {supplier?.name || 'Fornecedor Desconhecido'}</span>
+                            <span className="flex items-center gap-1"><Hash size={10} /> ID: {purchase.batchNumber || purchase.id.slice(-6).toUpperCase()}</span>
                           </div>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="font-black text-sm tracking-tight text-slate-900 dark:text-white">
-                          R$ {remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          R$ {remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                         {totalPaid > 0 ? (
                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 line-through">
-                             Total: R$ {purchase.total.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                             Total: R$ {purchase.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                            </p>
                         ) : (
                           <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest mt-1 ${isLate ? 'bg-rose-50 text-rose-500' : 'bg-amber-50 text-amber-500'}`}>
@@ -461,7 +464,7 @@ export default function FinancialView({
                           )}
                           {totalPaid > 0 && (
                             <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
-                               PAGO: R$ {totalPaid.toLocaleString('pt-BR')}
+                               PAGO: R$ {totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
                           )}
                         </div>
@@ -592,7 +595,7 @@ export default function FinancialView({
                   </div>
                   <div className="text-right">
                     <p className={`font-black text-sm tracking-tight ${transaction.type === TransactionType.INCOME ? 'text-emerald-500' : 'text-rose-500'}`}>
-                      {transaction.type === TransactionType.INCOME ? '+' : '-'} R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      {transaction.type === TransactionType.INCOME ? '+' : '-'} R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest mt-1 ${isPending ? 'bg-amber-50 text-amber-500' : 'bg-emerald-50 text-emerald-500'}`}>
                       {isPending ? <Clock size={10} /> : <CheckCircle2 size={10} />}
@@ -640,6 +643,8 @@ export default function FinancialView({
                         handleEdit(transaction);
                       }} 
                       className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-400 hover:text-indigo-500 active:bg-indigo-50 transition-all"
+                      title="Editar Lançamento"
+                      aria-label="Editar Lançamento"
                     >
                       <Edit size={18} strokeWidth={2.5} />
                     </button>
@@ -654,6 +659,8 @@ export default function FinancialView({
                           ? 'bg-slate-100 text-slate-300 animate-pulse'
                           : 'bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 active:bg-rose-50'
                       }`}
+                      title="Excluir Lançamento"
+                      aria-label="Excluir Lançamento"
                     >
                       {deletingId === transaction.id ? (
                         <RefreshCcw size={18} className="animate-spin" />

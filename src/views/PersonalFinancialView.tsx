@@ -190,6 +190,8 @@ export default function PersonalFinancialView({
             <button 
               onClick={isConfigMode ? () => setIsConfigMode(false) : onBack}
               className={`p-3 rounded-2xl border transition-all active:scale-95 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-100 text-slate-500'}`}
+              title="Voltar"
+              aria-label="Voltar"
             >
               <ArrowLeft size={18} />
             </button>
@@ -208,6 +210,8 @@ export default function PersonalFinancialView({
               <button 
                 onClick={() => setIsCalcModalOpen(true)}
                 className={`p-3 rounded-2xl border transition-all active:scale-95 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-100 text-slate-500'}`}
+                title="Abrir Calculadora"
+                aria-label="Abrir Calculadora"
               >
                 <Calculator size={20} className={isDarkMode ? 'text-emerald-400' : 'text-emerald-600'} />
               </button>
@@ -216,6 +220,8 @@ export default function PersonalFinancialView({
                 animate={{ scale: [1, 1.1, 1] }}
                 transition={{ repeat: Infinity, duration: 2 }}
                 className={`p-3 rounded-2xl border transition-all active:scale-95 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-100 text-slate-500'}`}
+                title="Configurações"
+                aria-label="Configurações"
               >
                 <Settings size={20} className={isDarkMode ? 'text-indigo-400' : 'text-indigo-600'} />
               </motion.button>
@@ -331,17 +337,52 @@ export default function PersonalFinancialView({
       {!isConfigMode ? (
         <>
           {/* Dashboard View */}
-          <div className={`p-8 rounded-[2.5rem] border shadow-sm relative overflow-hidden transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-indigo-600 border-indigo-500 text-white'}`}>
-            <div className="absolute top-5 right-8">
-                <button onClick={handleTransfer} className={`flex items-center gap-2 px-4 py-2 rounded-2xl text-[8px] font-black uppercase tracking-widest transition-all active:scale-95 ${isDarkMode ? 'bg-slate-800 text-indigo-400 border border-slate-700' : 'bg-white/20 text-white backdrop-blur-md border border-white/30'}`}>
-                  <ArrowRightLeft size={14} /> Receber Empresa
+          <div className={`p-8 rounded-[2.5rem] border shadow-xl relative overflow-hidden transition-all ${
+            isDarkMode 
+              ? 'bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/30 border-slate-800' 
+              : 'bg-gradient-to-br from-indigo-600 via-indigo-600 to-indigo-800 border-indigo-500 text-white'
+          }`}>
+            <div className="absolute -right-20 -top-20 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="absolute top-6 right-8">
+                <button 
+                  onClick={handleTransfer} 
+                  className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg ${
+                    isDarkMode 
+                      ? 'bg-slate-800/80 text-indigo-400 border border-slate-700 hover:bg-slate-700' 
+                      : 'bg-white/20 text-white backdrop-blur-md border border-white/30 hover:bg-white/30'
+                  }`}
+                  title="Receber da Empresa"
+                  aria-label="Receber transferência da empresa para conta pessoal"
+                >
+                  <ArrowRightLeft size={14} strokeWidth={3} /> Receber Empresa
                 </button>
             </div>
-            <p className={`text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-indigo-100'}`}>Saldo Atual</p>
-            <h2 className="text-4xl font-black mt-2 tracking-tighter">R$ {stats.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h2>
-            <div className="flex gap-6 mt-8">
-              <div><p className="text-[8px] font-black uppercase tracking-widest opacity-80">Entradas (Mês)</p><p className="text-lg font-bold text-emerald-400">R$ {stats.income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>
-              <div><p className="text-[8px] font-black uppercase tracking-widest opacity-80">Saídas (Mês)</p><p className="text-lg font-bold text-rose-400">R$ {stats.expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p></div>
+            
+            <div className="relative z-10">
+              <p className={`text-[10px] font-black uppercase tracking-widest ${isDarkMode ? 'text-slate-500' : 'text-indigo-100/70'}`}>Saldo Disponível</p>
+              <h2 className="text-4xl font-black mt-2 tracking-tighter flex items-baseline gap-2">
+                <span className="text-sm opacity-50 font-bold tracking-normal">R$</span>
+                {stats.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </h2>
+              
+              <div className="grid grid-cols-2 gap-4 mt-10">
+                <div className={`p-4 rounded-3xl ${isDarkMode ? 'bg-slate-800/50' : 'bg-white/10 backdrop-blur-sm'}`}>
+                  <p className="text-[8px] font-black uppercase tracking-widest opacity-60 mb-1">Entradas (Mês)</p>
+                  <p className="text-lg font-black text-emerald-400 flex items-center gap-2">
+                    <TrendingUp size={16} />
+                    R$ {stats.income.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+                <div className={`p-4 rounded-3xl ${isDarkMode ? 'bg-slate-800/50' : 'bg-white/10 backdrop-blur-sm'}`}>
+                  <p className="text-[8px] font-black uppercase tracking-widest opacity-60 mb-1">Saídas (Mês)</p>
+                  <p className="text-lg font-black text-rose-400 flex items-center gap-2">
+                    <TrendingDown size={16} />
+                    R$ {stats.expenses.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -384,8 +425,8 @@ export default function PersonalFinancialView({
                         </div>
 
                         <div className="flex justify-between items-center opacity-60">
-                           <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Gasto: R$ {bp.consumed.toLocaleString('pt-BR')}</p>
-                           <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Teto: R$ {bp.amount.toLocaleString('pt-BR')}</p>
+                           <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Gasto: R$ {bp.consumed.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                           <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">Teto: R$ {bp.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                         </div>
                       </div>
                     );
@@ -402,12 +443,19 @@ export default function PersonalFinancialView({
                 <input 
                   type="text" 
                   placeholder="Buscar gastos ou membros..."
-                  className={`w-full py-4 pl-12 pr-4 rounded-2xl border text-[11px] font-bold uppercase tracking-tight focus:outline-none focus:ring-4 focus:ring-indigo-500/5 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'}`}
+                  className={`w-full py-4 pl-12 pr-4 rounded-2xl border text-[11px] font-bold uppercase tracking-tight focus:outline-none focus:ring-4 focus:ring-indigo-500/5 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white placeholder:text-slate-600' : 'bg-white border-slate-100 text-slate-800 placeholder:text-slate-300'}`}
                   value={searchTerm}
+                  title="Pesquisar Transações"
+                  aria-label="Pesquisar gastos ou membros da família"
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <button onClick={() => handleAddTx(TransactionType.EXPENSE)} className="bg-indigo-600 text-white px-6 rounded-2xl flex items-center shadow-lg active:scale-95 transition-all">
+              <button 
+                onClick={() => handleAddTx(TransactionType.EXPENSE)} 
+                className="bg-indigo-600 text-white px-6 rounded-2xl flex items-center shadow-lg active:scale-95 transition-all"
+                title="Adicionar Gasto"
+                aria-label="Adicionar Gasto"
+              >
                 <Plus size={20} strokeWidth={4} />
               </button>
             </div>
@@ -436,11 +484,25 @@ export default function PersonalFinancialView({
                     </div>
                     <div className="text-right">
                       <p className={`text-sm font-black tracking-tight ${t.type === TransactionType.INCOME ? 'text-emerald-500' : 'text-rose-500'}`}>
-                        {t.type === TransactionType.INCOME ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                         {t.type === TransactionType.INCOME ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </p>
                       <div className="flex gap-1 mt-1 justify-end">
-                        <button onClick={() => { setEditingTransaction(t); setIsTxModalOpen(true); }} className="p-1 text-slate-300 hover:text-indigo-400"><Edit size={14} /></button>
-                        <button onClick={() => { setIdToDelete(t.id); setDeleteType('TX'); setIsConfirmOpen(true); }} className="p-1 text-slate-300 hover:text-rose-500"><Trash2 size={14} /></button>
+                        <button 
+                          onClick={() => { setEditingTransaction(t); setIsTxModalOpen(true); }} 
+                          className="p-1 text-slate-300 hover:text-indigo-400"
+                          title="Editar Transação"
+                          aria-label="Editar Transação"
+                        >
+                          <Edit size={14} />
+                        </button>
+                        <button 
+                          onClick={() => { setIdToDelete(t.id); setDeleteType('TX'); setIsConfirmOpen(true); }} 
+                          className="p-1 text-slate-300 hover:text-rose-500"
+                          title="Excluir Transação"
+                          aria-label="Excluir Transação"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -462,16 +524,18 @@ export default function PersonalFinancialView({
               <button
                 key={tab.id}
                 onClick={() => setConfigTab(tab.id as any)}
-                className={`py-4 rounded-3xl flex flex-col items-center justify-center gap-2 border transition-all ${
+                title={`Gerenciar ${tab.label}`}
+                aria-label={`Ver configurações de ${tab.label}`}
+                className={`py-5 rounded-[2rem] flex flex-col items-center justify-center gap-3 border transition-all ${
                   configTab === tab.id 
-                    ? `${isDarkMode ? 'bg-slate-800' : 'bg-white'} border-slate-200 dark:border-slate-700 shadow-lg` 
-                    : `${isDarkMode ? 'bg-slate-900' : 'bg-slate-50'} border-transparent`
+                    ? `${isDarkMode ? 'bg-slate-800 border-indigo-500/50 shadow-indigo-500/10' : 'bg-white border-indigo-500/20 shadow-indigo-500/10'} shadow-xl scale-[1.02]` 
+                    : `${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-transparent'} grayscale opacity-60 hover:grayscale-0 hover:opacity-100`
                 }`}
               >
-                <div className={`${tab.color} text-white p-3 rounded-2xl`}>
+                <div className={`${tab.color} text-white p-3.5 rounded-2xl shadow-lg`}>
                     <tab.icon size={20} />
                 </div>
-                <span className={`text-[10px] font-black uppercase tracking-widest ${configTab === tab.id ? 'text-slate-800 dark:text-white' : 'text-slate-400'}`}>
+                <span className={`text-[9px] font-black uppercase tracking-widest ${configTab === tab.id ? 'text-slate-800 dark:text-white' : 'text-slate-400'}`}>
                     {tab.label}
                 </span>
               </button>
@@ -485,6 +549,8 @@ export default function PersonalFinancialView({
               else if (configTab === 'BUDGETS') { setEditingBudget(undefined); setIsBudgetModalOpen(true); }
               else { setEditingCategory(null); setIsCatModalOpen(true); }
             }}
+            title={configTab === 'MEMBERS' ? 'Cadastrar Membro' : configTab === 'CONTACTS' ? 'Novo Fornecedor' : configTab === 'BUDGETS' ? 'Novo Orçamento' : 'Criar Categoria'}
+            aria-label={configTab === 'MEMBERS' ? 'Adicionar novo membro da família' : configTab === 'CONTACTS' ? 'Adicionar novo fornecedor' : configTab === 'BUDGETS' ? 'Adicionar novo orçamento' : 'Criar nova categoria pessoal'}
             className="bg-indigo-600 text-white w-full py-4 rounded-3xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 active:scale-95 transition-all"
           >
             <Plus size={18} strokeWidth={4} /> {configTab === 'MEMBERS' ? 'Cadastrar Membro' : configTab === 'CONTACTS' ? 'Novo Fornecedor' : configTab === 'BUDGETS' ? 'Novo Orçamento' : 'Criar Categoria'}
@@ -498,8 +564,22 @@ export default function PersonalFinancialView({
                    <h4 className={`text-xs font-black uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{m.name}</h4>
                  </div>
                  <div className="flex gap-1">
-                   <button onClick={() => { setEditingFm(m); setIsFmModalOpen(true); }} className="p-2 text-slate-300 hover:text-indigo-400"><Edit size={18} /></button>
-                   <button onClick={() => { setIdToDelete(m.id); setDeleteType('FM'); setIsConfirmOpen(true); }} className="p-2 text-slate-300 hover:text-rose-500"><Trash2 size={18} /></button>
+                   <button 
+                     onClick={() => { setEditingFm(m); setIsFmModalOpen(true); }} 
+                     className="p-2 text-slate-300 hover:text-indigo-400"
+                     title="Editar Membro"
+                     aria-label="Editar Membro"
+                   >
+                     <Edit size={18} />
+                   </button>
+                   <button 
+                     onClick={() => { setIdToDelete(m.id); setDeleteType('FM'); setIsConfirmOpen(true); }} 
+                     className="p-2 text-slate-300 hover:text-rose-500"
+                     title="Excluir Membro"
+                     aria-label="Excluir Membro"
+                   >
+                     <Trash2 size={18} />
+                   </button>
                  </div>
                </div>
              ))}
@@ -514,8 +594,22 @@ export default function PersonalFinancialView({
                    </div>
                  </div>
                  <div className="flex gap-1">
-                   <button onClick={() => { setEditingPc(c); setIsPcModalOpen(true); }} className="p-2 text-slate-300 hover:text-emerald-400"><Edit size={18} /></button>
-                   <button onClick={() => { setIdToDelete(c.id); setDeleteType('PC'); setIsConfirmOpen(true); }} className="p-2 text-slate-300 hover:text-rose-500"><Trash2 size={18} /></button>
+                   <button 
+                     onClick={() => { setEditingPc(c); setIsPcModalOpen(true); }} 
+                     className="p-2 text-slate-300 hover:text-emerald-400"
+                     title="Editar Fornecedor"
+                     aria-label="Editar Fornecedor"
+                   >
+                     <Edit size={18} />
+                   </button>
+                   <button 
+                     onClick={() => { setIdToDelete(c.id); setDeleteType('PC'); setIsConfirmOpen(true); }} 
+                     className="p-2 text-slate-300 hover:text-rose-500"
+                     title="Excluir Fornecedor"
+                     aria-label="Excluir Fornecedor"
+                   >
+                     <Trash2 size={18} />
+                   </button>
                  </div>
                </div>
              ))}
@@ -526,11 +620,25 @@ export default function PersonalFinancialView({
                  <div key={b.id} className={`p-4 rounded-2xl border flex items-center justify-between ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                    <div className="flex flex-col gap-1">
                      <h4 className={`text-xs font-black uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{cat?.name}</h4>
-                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Teto: R$ {b.amount.toLocaleString('pt-BR')} • {b.memberIds.length === 0 ? 'Todos' : `${b.memberIds.length} Membros`}</p>
+                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Teto: R$ {b.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} • {b.memberIds.length === 0 ? 'Todos' : `${b.memberIds.length} Membros`}</p>
                    </div>
                    <div className="flex gap-1">
-                     <button onClick={() => { setEditingBudget(b); setIsBudgetModalOpen(true); }} className="p-2 text-slate-300 hover:text-indigo-400"><Edit size={18} /></button>
-                     <button onClick={() => { setIdToDelete(b.id); setDeleteType('BUDGET'); setIsConfirmOpen(true); }} className="p-2 text-slate-300 hover:text-rose-500"><Trash2 size={18} /></button>
+                      <button 
+                        onClick={() => { setEditingBudget(b); setIsBudgetModalOpen(true); }} 
+                        className="p-2 text-slate-300 hover:text-indigo-400"
+                        title="Editar Orçamento"
+                        aria-label="Editar Orçamento"
+                      >
+                        <Edit size={18} />
+                      </button>
+                      <button 
+                        onClick={() => { setIdToDelete(b.id); setDeleteType('BUDGET'); setIsConfirmOpen(true); }} 
+                        className="p-2 text-slate-300 hover:text-rose-500"
+                        title="Excluir Orçamento"
+                        aria-label="Excluir Orçamento"
+                      >
+                        <Trash2 size={18} />
+                      </button>
                    </div>
                  </div>
                );
@@ -543,8 +651,22 @@ export default function PersonalFinancialView({
                    <h4 className={`text-xs font-black uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{c.name}</h4>
                  </div>
                  <div className="flex gap-1">
-                   <button onClick={() => { setEditingCategory(c); setIsCatModalOpen(true); }} className="p-2 text-slate-300 hover:text-indigo-400"><Edit size={18} /></button>
-                   <button onClick={() => { setIdToDelete(c.id); setDeleteType('CAT'); setIsConfirmOpen(true); }} className="p-2 text-slate-300 hover:text-rose-500"><Trash2 size={18} /></button>
+                    <button 
+                      onClick={() => { setEditingCategory(c); setIsCatModalOpen(true); }} 
+                      className="p-2 text-slate-300 hover:text-indigo-400"
+                      title="Editar Categoria"
+                      aria-label="Editar Categoria"
+                    >
+                      <Edit size={18} />
+                    </button>
+                    <button 
+                      onClick={() => { setIdToDelete(c.id); setDeleteType('CAT'); setIsConfirmOpen(true); }} 
+                      className="p-2 text-slate-300 hover:text-rose-500"
+                      title="Excluir Categoria"
+                      aria-label="Excluir Categoria"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                  </div>
                </div>
              ))}

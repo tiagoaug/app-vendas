@@ -1,5 +1,5 @@
 import { useState, useMemo, ReactNode } from "react";
-import { Sale, Purchase, Product, CompanyCheck, Transaction, TransactionType, Account, AccountType, SaleStatus, Person, ViewType } from "../types";
+import { Sale, Purchase, Product, CompanyCheck, Transaction, TransactionType, Account, AccountType, SaleStatus, PaymentStatus, Person, ViewType } from "../types";
 import {
   TrendingUp,
   TrendingDown,
@@ -107,7 +107,7 @@ export default function DashboardView({
       c.supplierName,
       format(c.dueDate, 'dd/MM/yyyy'),
       statusMap[c.status]?.label || c.status,
-      `R$ ${c.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      `R$ ${c.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     ]);
 
     autoTable(doc, {
@@ -127,6 +127,8 @@ export default function DashboardView({
 
     purchases.forEach(purchase => {
       if (purchase.generateTransaction === false) return; // Do not include "Não Contábil"
+      if (purchase.paymentStatus === PaymentStatus.PAID) return; // Skip paid purchases
+      
       const totalPaid = (purchase.paymentHistory || []).reduce((acc, p) => acc + p.amount, 0);
       const debt = purchase.total - totalPaid;
       if (debt > 0.01) {
@@ -148,11 +150,33 @@ export default function DashboardView({
       .sort((a, b) => b.totalDebt - a.totalDebt);
   }, [purchases, people, supplierDebtsSearch]);
 
+  const pendingPurchases = useMemo(() => {
+    return purchases
+      .filter(p => {
+        if (p.generateTransaction === false) return false;
+        if (p.paymentStatus === PaymentStatus.PAID) return false;
+
+        const totalPaid = (p.paymentHistory || []).reduce((acc, ph) => acc + ph.amount, 0);
+        const debt = p.total - totalPaid;
+        const matchesSearch = people.find(person => person.id === p.supplierId)?.name.toLowerCase().includes(supplierDebtsSearch.toLowerCase()) || 
+                             p.batchNumber?.toLowerCase().includes(supplierDebtsSearch.toLowerCase());
+        return debt > 0.01 && matchesSearch;
+      })
+      .map(p => ({
+        ...p,
+        supplierName: people.find(person => person.id === p.supplierId)?.name || "Fornecedor",
+        debt: p.total - (p.paymentHistory || []).reduce((acc, ph) => acc + ph.amount, 0)
+      }))
+      .sort((a, b) => b.date - a.date);
+  }, [purchases, people, supplierDebtsSearch]);
+
   const customersWithDebts = useMemo(() => {
     const debtsByCustomer: Record<string, { person: Person, totalDebt: number, pendingCount: number }> = {};
 
     sales.forEach(sale => {
       if (sale.status === SaleStatus.CANCELLED) return;
+      if (sale.paymentStatus === PaymentStatus.PAID) return;
+
       const totalPaid = (sale.paymentHistory || []).reduce((acc, p) => acc + p.amount, 0);
       const debt = sale.total - totalPaid;
       if (debt > 0.01) {
@@ -224,7 +248,7 @@ export default function DashboardView({
       .slice(0, 5);
 
     const pendingReceivables = sales
-      .filter(s => s.status !== SaleStatus.CANCELLED)
+      .filter(s => s.status !== SaleStatus.CANCELLED && s.paymentStatus !== PaymentStatus.PAID)
       .reduce((acc, sale) => {
         const totalPaid = (sale.paymentHistory || []).reduce((acc, p) => acc + p.amount, 0);
         return acc + Math.max(0, sale.total - totalPaid);
@@ -304,6 +328,7 @@ export default function DashboardView({
               R${" "}
               {stats.consolidatedBalance.toLocaleString("pt-BR", {
                 minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
               })}
             </p>
           </div>
@@ -321,7 +346,7 @@ export default function DashboardView({
               Balanço Mensal (Liquidados)
             </p>
             <p className={`text-2xl font-black tracking-tight leading-none ${stats.monthlyIncome - stats.monthlyExpenses >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-              R$ {(stats.monthlyIncome - stats.monthlyExpenses).toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+              R$ {(stats.monthlyIncome - stats.monthlyExpenses).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${stats.monthlyIncome - stats.monthlyExpenses >= 0 ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'}`}>
@@ -342,7 +367,8 @@ export default function DashboardView({
             >
               R${" "}
               {stats.pendingReceivables.toLocaleString("pt-BR", {
-                minimumFractionDigits: 0,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
               })}
             </p>
           </div>
@@ -390,7 +416,7 @@ export default function DashboardView({
                     <div key={`${product.id}-${vIdx}`} className={`p-3 rounded-xl border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
                         <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">{product.name}</p>
                         <p className="text-[9px] text-slate-500 mt-0.5">
-                          Cor: {variation.colorName || 'Padrão'} | Qtd: {Object.values(variation.stock).reduce((sum: number, s: any) => sum + Number(s || 0), 0)}
+                          Cor: {variation.colorName || 'Padrão'} | Qtd: <span className="text-rose-500 font-bold">{Object.values(variation.stock).reduce((sum: number, s: any) => sum + Number(s || 0), 0)}</span>
                         </p>
                     </div>
                 ))
@@ -467,7 +493,7 @@ export default function DashboardView({
                         <div className="flex justify-between items-center">
                           <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight">{item.person.name}</p>
                           <p className="text-[11px] font-black text-rose-500">
-                            R$ {item.totalDebt.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            R$ {item.totalDebt.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                         </div>
                         <p className="text-[9px] text-slate-500 mt-0.5 uppercase tracking-widest">
@@ -489,7 +515,7 @@ export default function DashboardView({
                         <div className="flex justify-between items-center">
                           <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight">{person.name}</p>
                           <p className="text-[11px] font-black text-emerald-500">
-                            R$ {(person.credit || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            R$ {(person.credit || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                         </div>
                     </div>
@@ -512,12 +538,12 @@ export default function DashboardView({
                 onClick={() => setSupplierDashboardTab('DEBITS')}
                 className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${supplierDashboardTab === 'DEBITS' ? 'bg-slate-500 dark:bg-slate-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
               >
-                DÉBITOS
-                {suppliersWithDebts.length > 0 && (
+                PENDENTES
+                {pendingPurchases.length > 0 && (
                   <span className="relative flex h-4 w-4">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-4 w-4 bg-rose-500 text-white items-center justify-center text-[8px] font-bold">
-                      {suppliersWithDebts.length}
+                      {pendingPurchases.length}
                     </span>
                   </span>
                 )}
@@ -559,25 +585,32 @@ export default function DashboardView({
           <div className="h-[200px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
             {supplierDashboardTab === 'DEBITS' ? (
               <>
-                {suppliersWithDebts.map((item, idx) => (
+                {pendingPurchases.map((purchase, idx) => (
                     <div 
-                      key={`sup-debt-${item.person.id}-${idx}`} 
-                      onClick={() => onNavigate(ViewType.PURCHASES, null, item.person.name)}
+                      key={`sup-pending-${purchase.id}-${idx}`} 
+                      onClick={() => onNavigate(ViewType.PURCHASE_FORM, purchase.id)}
                       className={`p-3 rounded-xl border cursor-pointer transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}
                     >
                         <div className="flex justify-between items-center">
-                          <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight">{item.person.name}</p>
+                          <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight">{purchase.supplierName}</p>
                           <p className="text-[11px] font-black text-rose-500">
-                            R$ {item.totalDebt.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            R$ {purchase.debt.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                         </div>
-                        <p className="text-[9px] text-slate-500 mt-0.5 uppercase tracking-widest">
-                          {item.pendingCount} {item.pendingCount === 1 ? 'compra pendente' : 'compras pendentes'}
-                        </p>
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">
+                            {format(purchase.date, 'dd/MM/yyyy')}
+                          </p>
+                          {purchase.batchNumber && (
+                            <p className="text-[8px] text-indigo-500 dark:text-indigo-400 font-black uppercase tracking-widest">
+                              #{purchase.batchNumber}
+                            </p>
+                          )}
+                        </div>
                     </div>
                 ))}
-                {suppliersWithDebts.length === 0 && (
-                     <p className="text-[10px] text-center text-slate-400 py-4">Nenhum débito com fornecedor.</p>
+                {pendingPurchases.length === 0 && (
+                     <p className="text-[10px] text-center text-slate-400 py-4">Nenhuma compra pendente.</p>
                 )}
               </>
             ) : (
@@ -590,7 +623,7 @@ export default function DashboardView({
                         <div className="flex justify-between items-center">
                           <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight">{person.name}</p>
                           <p className="text-[11px] font-black text-emerald-500">
-                            R$ {(person.credit || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                            R$ {(person.credit || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </p>
                         </div>
                     </div>
@@ -616,13 +649,13 @@ export default function DashboardView({
               <div className="flex items-baseline gap-2">
                 <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">CUSTO:</span>
                 <p className={`text-2xl font-black tracking-tighter ${isDarkMode ? "text-white" : "text-slate-900"}`}>
-                  R$ {stats.totalStockCostValue.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                  R$ {stats.totalStockCostValue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
               </div>
               <div className="mt-2 flex items-center gap-2">
                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                  <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">
-                    Venda: R$ {stats.totalStockSaleValue.toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                    Venda: R$ {stats.totalStockSaleValue.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                  </p>
               </div>
             </div>
@@ -665,9 +698,9 @@ export default function DashboardView({
                   <button 
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[8px] font-black uppercase tracking-widest hover:bg-indigo-50 transition-all border border-slate-100 dark:border-slate-700 active:scale-95"
                     onClick={() => {
-                      const summary = filteredChecks.map(c => `${c.number} - R$ ${c.value.toLocaleString('pt-BR')} - ${format(c.dueDate, 'dd/MM/yyyy')}`).join('\n');
-                      navigator.clipboard.writeText(summary);
-                      alert('Lista de cheques copiada!');
+                    const summary = filteredChecks.map(c => `${c.number} - R$ ${c.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} - ${format(c.dueDate, 'dd/MM/yyyy')}`).join('\n');
+                    navigator.clipboard.writeText(summary);
+                    alert('Lista de cheques copiada!');
                     }}
                   >
                     <Copy size={12} />
@@ -693,7 +726,12 @@ export default function DashboardView({
                   onChange={(e) => setChecksSearch(e.target.value)}
                 />
                 {checksSearch && (
-                  <button onClick={() => setChecksSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300">
+                  <button 
+                    onClick={() => setChecksSearch("")} 
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300"
+                    title="Limpar busca"
+                    aria-label="Limpar busca"
+                  >
                     <X size={14} />
                   </button>
                 )}
@@ -748,7 +786,7 @@ export default function DashboardView({
                         </div>
                         <div className="text-right">
                           <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest leading-none mb-1">Valor</p>
-                          <p className="text-sm font-black tracking-tight text-indigo-600 dark:text-indigo-400">R$ {check.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                          <p className="text-sm font-black tracking-tight text-indigo-600 dark:text-indigo-400">R$ {check.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                         </div>
                       </div>
 
@@ -922,7 +960,7 @@ export default function DashboardView({
                     }`}
                   >
                     {(activity.activityType === "sale" || (activity.activityType === "transaction" && activity.type === TransactionType.INCOME)) ? "+" : "-"} 
-                    R$ {Number(activity.total || activity.amount).toLocaleString("pt-BR", { minimumFractionDigits: 0 })}
+                    R$ {Number(activity.total || activity.amount).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                   <div className="flex items-center gap-1 justify-end mt-1">
                     <span

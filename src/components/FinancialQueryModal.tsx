@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Person, Transaction, TransactionType } from '../types';
+import { Person, Transaction, TransactionType, Sale, Purchase } from '../types';
 import { Search, X, User, DollarSign, TrendingUp, TrendingDown, Clock, CheckCircle2, Calendar, ChevronDown, ChevronUp, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -8,6 +8,8 @@ interface FinancialQueryModalProps {
   onClose: () => void;
   people: Person[];
   transactions: Transaction[];
+  purchases: Purchase[];
+  sales: Sale[];
   onSettle: (transaction: Transaction) => Promise<void>;
   isDarkMode: boolean;
 }
@@ -17,6 +19,8 @@ export default function FinancialQueryModal({
   onClose,
   people,
   transactions,
+  purchases,
+  sales,
   onSettle,
   isDarkMode
 }: FinancialQueryModalProps) {
@@ -114,6 +118,8 @@ export default function FinancialQueryModal({
             <button 
               onClick={onClose}
               className={`p-2 rounded-xl transition-all active:scale-95 ${isDarkMode ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}
+              title="Fechar"
+              aria-label="Fechar"
             >
               <X size={24} strokeWidth={2.5} />
             </button>
@@ -140,6 +146,7 @@ export default function FinancialQueryModal({
             <input 
               type="text" 
               placeholder="Pesquisar por nome, fornecedor ou ID..."
+              title="Pesquisar"
               className={`w-full h-11 pl-12 pr-4 rounded-xl border text-xs font-bold uppercase tracking-tight focus:outline-none focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400 transition-all ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}
               value={searchTerm}
               onChange={(e) => {
@@ -157,6 +164,8 @@ export default function FinancialQueryModal({
                       setSelectedPersonId(person.id);
                       setSearchTerm(person.name);
                     }}
+                    title={person.name}
+                    aria-label={`Selecionar ${person.name}`}
                     className={`w-full p-3 flex items-center gap-3 hover:bg-indigo-500/10 text-left transition-colors border-b last:border-b-0 ${isDarkMode ? 'border-slate-700' : 'border-slate-100'}`}
                   >
                     <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
@@ -177,6 +186,8 @@ export default function FinancialQueryModal({
         <div className={`mx-4 mt-4 shrink-0 rounded-[2rem] border overflow-hidden transition-all duration-300 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-sm'}`}>
           <button 
             onClick={() => setIsExpanded(!isExpanded)}
+            title="Expandir/Recolher Filtros"
+            aria-label="Expandir ou recolher seção de filtros"
             className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-500/5 transition-colors"
           >
             <div className="flex items-center gap-3">
@@ -233,6 +244,8 @@ export default function FinancialQueryModal({
                         <button
                           key={f.id}
                           onClick={() => setStatusFilter(f.id as any)}
+                          title={f.label}
+                          aria-label={`Filtrar por ${f.label}`}
                           className={`flex-1 h-9 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${statusFilter === f.id ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-500' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
                         >
                           {f.label}
@@ -261,6 +274,8 @@ export default function FinancialQueryModal({
                           type="date" 
                           value={startDate}
                           onChange={(e) => setStartDate(e.target.value)}
+                          title="Data Inicial"
+                          placeholder="Data Inicial"
                           className="bg-transparent text-[9px] font-black uppercase tracking-widest focus:outline-none w-full text-current"
                         />
                       </div>
@@ -271,6 +286,8 @@ export default function FinancialQueryModal({
                           type="date" 
                           value={endDate}
                           onChange={(e) => setEndDate(e.target.value)}
+                          title="Data Final"
+                          placeholder="Data Final"
                           className="bg-transparent text-[9px] font-black uppercase tracking-widest focus:outline-none w-full text-current"
                         />
                       </div>
@@ -339,7 +356,14 @@ export default function FinancialQueryModal({
                           </div>
                           <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest truncate">
                             {tx.contactName || 'Sem contato'} • {new Date(tx.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                            {tx.relatedId && ` • ID: ${tx.relatedId}`}
+                            {(() => {
+                              if (!tx.relatedId) return null;
+                              const purchase = purchases.find(p => p.id === tx.relatedId);
+                              if (purchase?.batchNumber) return ` • ID: ${purchase.batchNumber}`;
+                              const sale = sales.find(s => s.id === tx.relatedId);
+                              if (sale?.orderNumber) return ` • ID: ${sale.orderNumber}`;
+                              return ` • ID: ${tx.relatedId.slice(-6).toUpperCase()}`;
+                            })()}
                           </p>
                         </div>
                       </div>

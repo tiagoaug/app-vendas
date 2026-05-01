@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { Person, Transaction, TransactionType, Sale, Purchase, Category, Account, SaleStatus } from '../types';
 import { ArrowLeft, TrendingUp, TrendingDown, DollarSign, Calendar, Wallet, Package, ShoppingCart } from 'lucide-react';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 interface PersonDetailViewProps {
   personId: string;
@@ -57,12 +56,12 @@ export default function PersonDetailView({
     return { totalTransactions, pendingToReceive, pendingToPay };
   }, [personTransactions]);
 
-  if (!person) return <div>Pessoa não encontrada</div>;
+  if (!person) return <div className="p-8 text-center font-bold text-slate-500">Pessoa não encontrada</div>;
 
   return (
     <div className="flex flex-col gap-6 pb-40">
       <div className="flex items-center gap-4">
-        <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors text-slate-400">
+        <button onClick={onBack} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors text-slate-400" title="Voltar" aria-label="Voltar">
           <ArrowLeft size={24} />
         </button>
         <div>
@@ -78,14 +77,14 @@ export default function PersonDetailView({
             <TrendingUp size={16} strokeWidth={3} />
             <span className="text-[8px] font-black uppercase tracking-widest">A Receber</span>
           </div>
-          <p className="text-xl font-black text-emerald-600 tracking-tighter">R$ {stats.pendingToReceive.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          <p className="text-xl font-black text-emerald-600 tracking-tighter">R$ {stats.pendingToReceive.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
         <div className={`p-5 rounded-[2rem] border ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-rose-50 border-rose-100'}`}>
           <div className="flex items-center gap-2 text-rose-600 mb-2">
             <TrendingDown size={16} strokeWidth={3} />
             <span className="text-[8px] font-black uppercase tracking-widest">A Pagar</span>
           </div>
-          <p className="text-xl font-black text-rose-600 tracking-tighter">R$ {stats.pendingToPay.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          <p className="text-xl font-black text-rose-600 tracking-tighter">R$ {stats.pendingToPay.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
       </div>
 
@@ -117,7 +116,7 @@ export default function PersonDetailView({
                     </div>
                   </div>
                   <p className={`font-black text-xs ${t.type === TransactionType.INCOME ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    {t.type === TransactionType.INCOME ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    {t.type === TransactionType.INCOME ? '+' : '-'} R$ {t.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
               );
@@ -146,7 +145,7 @@ export default function PersonDetailView({
                     </div>
                   </div>
                   <p className={`font-black text-xs ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                    R$ {s.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {s.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
               ))}
@@ -175,7 +174,7 @@ export default function PersonDetailView({
                     </div>
                   </div>
                   <p className={`font-black text-xs ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                    R$ {p.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {p.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
               ))}

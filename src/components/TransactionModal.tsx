@@ -129,7 +129,12 @@ export default function TransactionModal({
             </h2>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Gestão Financeira</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors text-slate-400">
+          <button 
+            onClick={onClose} 
+            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-2xl transition-colors text-slate-400"
+            title="Fechar"
+            aria-label="Fechar"
+          >
             <X size={24} />
           </button>
         </div>
@@ -159,6 +164,7 @@ export default function TransactionModal({
                   <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
                   <input
                     type="number"
+                    step="0.01"
                     className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl py-4 pl-12 pr-12 text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 transition-all dark:text-white"
                     placeholder="0,00"
                     value={amount}
@@ -168,6 +174,8 @@ export default function TransactionModal({
                     type="button"
                     onClick={() => setIsCalculatorOpen(!isCalculatorOpen)}
                     className={`absolute right-4 top-1/2 -translate-y-1/2 transition-colors ${isCalculatorOpen ? 'text-indigo-500' : 'text-slate-300 hover:text-indigo-400'}`}
+                    title="Abrir calculadora"
+                    aria-label="Abrir calculadora"
                   >
                     <CalculatorIcon size={18} />
                   </button>
@@ -189,6 +197,8 @@ export default function TransactionModal({
                     className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl py-4 pl-12 pr-4 text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 transition-all dark:text-white"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
+                    title="Data do lançamento"
+                    aria-label="Data do lançamento"
                   />
                 </div>
               </div>
@@ -214,6 +224,8 @@ export default function TransactionModal({
                     className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl py-4 pl-12 pr-4 text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 transition-all dark:text-white appearance-none"
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
+                    title="Selecione a categoria"
+                    aria-label="Selecione a categoria"
                   >
                     <option value="">Selecione...</option>
                     {filteredCategories.map(c => (
@@ -230,6 +242,8 @@ export default function TransactionModal({
                     className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl py-4 pl-12 pr-4 text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 transition-all dark:text-white appearance-none"
                     value={accountId}
                     onChange={(e) => setAccountId(e.target.value)}
+                    title="Selecione a conta bancária"
+                    aria-label="Selecione a conta bancária"
                   >
                     <option value="">Selecione...</option>
                     {accounts.map(a => (
@@ -262,6 +276,8 @@ export default function TransactionModal({
                     className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl py-4 pl-12 pr-4 text-sm font-bold focus:ring-4 focus:ring-indigo-500/10 transition-all dark:text-white appearance-none"
                     value={memberId}
                     onChange={(e) => setMemberId(e.target.value)}
+                    title="Selecione o membro da família"
+                    aria-label="Selecione o membro da família"
                   >
                     <option value="">Todos / Não atribuído</option>
                     {familyMembers.map(m => (

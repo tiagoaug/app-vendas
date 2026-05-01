@@ -114,6 +114,7 @@ export default function PurchaseFormView({
     existing?.batchNumber ||
       `LOT-${Date.now().toString().slice(-5).toUpperCase()}`,
   );
+  const [isAutoBatchNumber, setIsAutoBatchNumber] = useState(!existing?.batchNumber);
   const [dueDate, setDueDate] = useState<number>(
     existing?.dueDate || Date.now(),
   );
@@ -345,12 +346,16 @@ export default function PurchaseFormView({
           <button
             onClick={() => setType(PurchaseType.REPLENISHMENT)}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${type === PurchaseType.REPLENISHMENT ? "bg-white dark:bg-slate-700 shadow-lg text-indigo-600 dark:text-indigo-400" : "text-slate-400 dark:text-slate-500"}`}
+            aria-label="Tipo de compra estoque"
+            title="Estoque"
           >
             <Package size={14} strokeWidth={2.5} className={type === PurchaseType.REPLENISHMENT ? "text-indigo-500" : ""} /> Estoque
           </button>
           <button
             onClick={() => setType(PurchaseType.GENERAL)}
             className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${type === PurchaseType.GENERAL ? "bg-white dark:bg-slate-700 shadow-lg text-amber-600 dark:text-amber-400" : "text-slate-400 dark:text-slate-500"}`}
+            aria-label="Tipo de compra geral"
+            title="Geral"
           >
             <ShoppingCart size={14} strokeWidth={2.5} className={type === PurchaseType.GENERAL ? "text-amber-500" : ""} /> Geral
           </button>
@@ -379,6 +384,8 @@ export default function PurchaseFormView({
                 type="button"
                 onClick={() => setGenerateTransaction(true)}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${generateTransaction ? "bg-white dark:bg-slate-700 shadow-lg text-indigo-600 dark:text-indigo-400" : "text-slate-400 dark:text-slate-500"}`}
+                aria-label="Gerar transação contábil"
+                title="Contábil"
               >
                 <div className={`w-2 h-2 rounded-full ${generateTransaction ? 'bg-indigo-500 animate-pulse' : 'bg-slate-300'}`} />
                 Contábil
@@ -387,6 +394,8 @@ export default function PurchaseFormView({
                 type="button"
                 onClick={() => setGenerateTransaction(false)}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!generateTransaction ? "bg-white dark:bg-slate-700 shadow-lg text-slate-900 dark:text-white" : "text-slate-400 dark:text-slate-500"}`}
+                aria-label="Não gerar transação contábil"
+                title="Não Contábil"
               >
                 <div className={`w-2 h-2 rounded-full ${!generateTransaction ? 'bg-rose-500' : 'bg-slate-300'}`} />
                 Não Contábil
@@ -401,13 +410,45 @@ export default function PurchaseFormView({
             <label className="text-[9px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 mb-2 block tracking-widest leading-none">
               Identificação da Compra/Lote
             </label>
+            <div className="flex items-center gap-3 mb-2 px-3">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <div className="relative">
+                  <input 
+                    type="checkbox"
+                    className="sr-only"
+                    checked={isAutoBatchNumber}
+                    aria-label="Gerar lote automático"
+                    onChange={() => {
+                      const newAuto = !isAutoBatchNumber;
+                      setIsAutoBatchNumber(newAuto);
+                      if (newAuto) {
+                        setBatchNumber(`LOT-${Date.now().toString().slice(-5).toUpperCase()}`);
+                      } else {
+                        setBatchNumber('');
+                      }
+                    }}
+                  />
+                  <div className={`w-8 h-4 rounded-full transition-colors ${isAutoBatchNumber ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-slate-700'}`} />
+                  <div className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm ${isAutoBatchNumber ? 'translate-x-4' : 'translate-x-0'}`} />
+                </div>
+                <span className={`text-[8px] font-black uppercase tracking-widest transition-colors ${isAutoBatchNumber ? 'text-indigo-500' : 'text-slate-400'}`}>
+                  Auto
+                </span>
+              </label>
+            </div>
             <div className="relative">
               <input
                 type="text"
-                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl px-5 py-4 text-[12px] font-black uppercase tracking-widest focus:ring-4 focus:ring-slate-900/5 dark:focus:ring-indigo-500/10 transition-all text-slate-900 dark:text-slate-100"
+                className={`w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl px-5 py-4 text-[12px] font-black uppercase tracking-widest focus:ring-4 focus:ring-slate-900/5 dark:focus:ring-indigo-500/10 transition-all ${isAutoBatchNumber ? 'text-slate-400' : 'text-indigo-500 dark:text-indigo-400'}`}
                 value={batchNumber}
-                onChange={(e) => setBatchNumber(e.target.value)}
+                onChange={(e) => {
+                  setBatchNumber(e.target.value);
+                  setIsAutoBatchNumber(false);
+                }}
                 placeholder="Ex: Nota Fiscal 1234"
+                disabled={isAutoBatchNumber}
+                aria-label="Número do lote"
+                title="Número do Lote"
               />
               <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
                 <Info size={14} className="text-cyan-400" />
@@ -427,6 +468,8 @@ export default function PurchaseFormView({
                 onChange={(e) =>
                   setDueDate(new Date(e.target.value).getTime() || Date.now())
                 }
+                aria-label="Data de vencimento"
+                title="Vencimento"
               />
               <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none">
                 <CalendarIcon size={14} className="text-amber-400" />
@@ -442,12 +485,16 @@ export default function PurchaseFormView({
               <button
                 onClick={() => setPaymentTerm(PaymentTerm.CASH)}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${paymentTerm === PaymentTerm.CASH ? "bg-white dark:bg-slate-700 shadow-lg text-slate-900 dark:text-white" : "text-slate-400 dark:text-slate-500"}`}
+                aria-label="Pagamento à vista"
+                title="À Vista"
               >
                 À Vista
               </button>
               <button
                 onClick={() => setPaymentTerm(PaymentTerm.INSTALLMENTS)}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${paymentTerm === PaymentTerm.INSTALLMENTS ? "bg-white dark:bg-slate-700 shadow-lg text-slate-900 dark:text-white" : "text-slate-400 dark:text-slate-500"}`}
+                aria-label="Pagamento a prazo"
+                title="A Prazo"
               >
                 A Prazo
               </button>
@@ -474,6 +521,8 @@ export default function PurchaseFormView({
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl px-5 py-4 text-[12px] font-black uppercase tracking-widest appearance-none focus:ring-4 focus:ring-slate-900/5 dark:focus:ring-indigo-500/10 transition-all text-slate-900 dark:text-slate-100"
                 value={accountId}
                 onChange={(e) => setAccountId(e.target.value)}
+                aria-label="Conta para pagamento"
+                title="Conta"
               >
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
@@ -503,6 +552,8 @@ export default function PurchaseFormView({
             <button
               onClick={addGeneralItem}
               className={`flex items-center gap-2 font-black text-[10px] uppercase tracking-widest bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl active:scale-95 transition-all ${isDarkMode ? "shadow-none" : "shadow-slate-200"}`}
+              aria-label="Adicionar item geral"
+              title="Adicionar Item"
             >
               <Plus size={14} strokeWidth={3} /> Adicionar
             </button>
@@ -526,11 +577,15 @@ export default function PurchaseFormView({
                           description: e.target.value,
                         })
                       }
+                      aria-label="Descrição do item"
+                      title="Descrição"
                     />
                   </div>
                   <button
                     onClick={() => removeGeneralItem(index)}
                     className="p-3 bg-rose-50 dark:bg-rose-900/30 text-rose-500 rounded-xl hover:bg-rose-100 transition-colors"
+                    aria-label="Remover item"
+                    title="Remover"
                   >
                     <Trash2 size={16} strokeWidth={2.5} />
                   </button>
@@ -543,6 +598,7 @@ export default function PurchaseFormView({
                     </div>
                     <input
                       type="number"
+                      step="0.01"
                       className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl pl-[2.4rem] pr-4 py-3 text-[14px] font-black text-slate-800 dark:text-slate-100 focus:ring-4 focus:ring-slate-900/5 dark:focus:ring-indigo-500/10 transition-all font-mono"
                       value={item.value || ""}
                       onChange={(e) =>
@@ -551,6 +607,8 @@ export default function PurchaseFormView({
                         })
                       }
                       placeholder="0.00"
+                      aria-label="Valor do item"
+                      title="Valor"
                     />
                   </div>
                   <button
@@ -560,6 +618,8 @@ export default function PurchaseFormView({
                       openCalculator(index, 'generalItems');
                     }}
                     className="w-[50px] shrink-0 flex items-center justify-center bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-2xl hover:bg-indigo-100 transition-colors"
+                    aria-label="Abrir calculadora de valor"
+                    title="Calculadora"
                   >
                     <Calculator size={18} strokeWidth={2.5} />
                   </button>
@@ -593,6 +653,8 @@ export default function PurchaseFormView({
             <button
               onClick={() => setShowProductModal(true)}
               className={`flex items-center gap-2 font-black text-[10px] uppercase tracking-widest bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl active:scale-95 transition-all ${isDarkMode ? "shadow-none" : "shadow-slate-200"}`}
+              aria-label="Adicionar modelo"
+              title="Adicionar Modelo"
             >
               <Plus size={14} strokeWidth={3} /> Modelo
             </button>
@@ -627,6 +689,8 @@ export default function PurchaseFormView({
                               variations: {}
                             });
                           }}
+                          aria-label="Selecionar produto"
+                          title="Produto"
                         >
                           {activeProducts
                             .filter(p => p.id === block.productId || !blocks.some((b, i) => i !== index && b.productId === p.id))
@@ -653,12 +717,16 @@ export default function PurchaseFormView({
                       <button
                         onClick={() => toggleBlockExpanded(block.id)}
                         className="p-2 text-slate-300 dark:text-slate-600 hover:text-indigo-500 transition-colors transform active:scale-90"
+                        aria-label="Expandir/Recolher item"
+                        title="Ver detalhes"
                       >
                         {isExpanded ? <ChevronUp size={20} strokeWidth={2.5} /> : <ChevronDown size={20} strokeWidth={2.5} />}
                       </button>
                       <button
                         onClick={() => removeBlock(index)}
                         className="p-2 text-slate-200 dark:text-slate-700 hover:text-rose-500 transition-colors transform active:scale-90"
+                        aria-label="Remover item da lista"
+                        title="Remover"
                       >
                         <Trash2 size={18} strokeWidth={2.5} />
                       </button>
@@ -675,6 +743,8 @@ export default function PurchaseFormView({
                             <button
                               onClick={() => updateBlock(index, { isBox: !block.isBox })}
                               className={`text-[9px] font-black py-3 rounded-2xl border-2 uppercase tracking-widest transition-all ${block.isBox ? "bg-slate-900 dark:bg-amber-600 text-white border-slate-900 dark:border-amber-600 shadow-lg" : "bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-100 dark:border-slate-700"}`}
+                              aria-label="Alternar unidade"
+                              title="Unidade"
                             >
                               {product.type === SaleType.WHOLESALE ? (block.isBox ? "Grade Fechada" : "Avulso") : (block.isBox ? "Caixa (12 Prs)" : "Par Individual")}
                             </button>
@@ -687,9 +757,12 @@ export default function PurchaseFormView({
                             <div className="flex gap-2">
                               <input
                                 type="number"
+                                step="0.01"
                                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl py-3 text-right pr-4 text-[13px] font-black text-slate-800 dark:text-slate-100 focus:ring-4 focus:ring-slate-900/5 dark:focus:ring-amber-500/10 transition-all"
                                 value={block.cost}
                                 onChange={(e) => updateBlock(index, { cost: parseFloat(e.target.value) || 0 })}
+                                aria-label="Custo do item"
+                                title="Custo"
                               />
                               <button
                                 type="button"
@@ -698,6 +771,8 @@ export default function PurchaseFormView({
                                   openCalculator(index, 'blocks');
                                 }}
                                 className="w-[45px] shrink-0 flex items-center justify-center bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-2xl hover:bg-indigo-100 transition-colors"
+                                aria-label="Abrir calculadora de custo"
+                                title="Calculadora"
                               >
                                 <Calculator size={18} strokeWidth={2.5} />
                               </button>
@@ -742,6 +817,8 @@ export default function PurchaseFormView({
                                       className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-1 px-4 text-center text-[9px] font-black text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-amber-500/20 transition-all appearance-none outline-none"
                                       value={size}
                                       onChange={(e) => updateVariation(index, v.id, quantity, e.target.value)}
+                                      aria-label={`Selecionar tamanho para ${v.colorName}`}
+                                      title="Tamanho"
                                     >
                                       <option value="">TAM.</option>
                                       {grids.find(g => g.id === product.defaultGridId)?.sizes.map(s => (
@@ -755,6 +832,8 @@ export default function PurchaseFormView({
                                       type="button"
                                       onClick={() => updateVariation(index, v.id, Math.max(0, quantity - 1), size)}
                                       className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                                      aria-label="Diminuir quantidade"
+                                      title="Diminuir"
                                     >
                                       <Minus size={14} strokeWidth={2.5} />
                                     </button>
@@ -765,6 +844,8 @@ export default function PurchaseFormView({
                                       type="button"
                                       onClick={() => updateVariation(index, v.id, quantity + 1, size)}
                                       className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 transition-colors"
+                                      aria-label="Aumentar quantidade"
+                                      title="Aumentar"
                                     >
                                       <Plus size={14} strokeWidth={2.5} />
                                     </button>
@@ -782,6 +863,8 @@ export default function PurchaseFormView({
                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl py-3 px-4 text-[10px] font-bold text-slate-600 dark:text-slate-300 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-900/5 dark:focus:ring-white/10 transition-all uppercase tracking-widest"
                            value={block.note || ''}
                            onChange={(e) => updateBlock(index, { note: e.target.value })}
+                           aria-label="Observações do item"
+                           title="Notas do Item"
                          />
                        </div>
                     </div>
@@ -827,6 +910,7 @@ export default function PurchaseFormView({
                   className="sr-only peer"
                   checked={showChecks}
                   onChange={(e) => setShowChecks(e.target.checked)}
+                  aria-label="Ativar controle de cheques"
                 />
                 <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-slate-900 border-2 border-transparent"></div>
               </label>
@@ -839,6 +923,8 @@ export default function PurchaseFormView({
                 <button
                   onClick={addCheck}
                   className={`flex items-center gap-2 font-black text-[10px] uppercase tracking-widest bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-xl active:scale-95 transition-all ${isDarkMode ? "shadow-none" : "shadow-slate-200"}`}
+                  aria-label="Adicionar cheque"
+                  title="Adicionar Cheque"
                 >
                   <Plus size={14} strokeWidth={3} /> Adicionar
                 </button>
@@ -867,6 +953,8 @@ export default function PurchaseFormView({
                           onChange={(e) =>
                             updateCheck(index, { number: e.target.value })
                           }
+                          aria-label="Número do cheque"
+                          title="Número do Cheque"
                         />
                       </div>
                     </div>
@@ -875,6 +963,8 @@ export default function PurchaseFormView({
                         setChecks(checks.filter((_, i) => i !== index));
                       }}
                       className="p-2 text-slate-200 dark:text-slate-700 hover:text-rose-500 transition-colors transform active:scale-90"
+                      aria-label="Remover cheque"
+                      title="Remover"
                     >
                       <Trash2 size={18} strokeWidth={2.5} />
                     </button>
@@ -887,6 +977,7 @@ export default function PurchaseFormView({
                       </label>
                       <input
                         type="number"
+                        step="0.01"
                         className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl py-3 px-4 text-[13px] font-black text-slate-800 dark:text-slate-100 focus:ring-4 focus:ring-slate-900/5 dark:focus:ring-indigo-500/10 transition-all font-mono"
                         value={check.value === 0 ? "" : check.value}
                         onChange={(e) =>
@@ -894,6 +985,8 @@ export default function PurchaseFormView({
                             value: parseFloat(e.target.value) || 0,
                           })
                         }
+                        aria-label="Valor do cheque"
+                        title="Valor"
                       />
                     </div>
                     <div className="relative">
@@ -910,6 +1003,8 @@ export default function PurchaseFormView({
                               new Date(e.target.value).getTime() || Date.now(),
                           })
                         }
+                        aria-label="Data de vencimento do cheque"
+                        title="Vencimento"
                       />
                     </div>
                   </div>
@@ -941,6 +1036,7 @@ export default function PurchaseFormView({
               className="sr-only peer"
               checked={showNotes}
               onChange={(e) => setShowNotes(e.target.checked)}
+              aria-label="Ativar observações"
             />
             <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:border-gray-600 peer-checked:bg-slate-900 border-2 border-transparent"></div>
           </label>
@@ -951,6 +1047,8 @@ export default function PurchaseFormView({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             placeholder="NOTAS GERAIS SOBRE A COMPRA..."
+            aria-label="Notas da compra"
+            title="Observações"
           />
         )}
       </div>
@@ -973,6 +1071,7 @@ export default function PurchaseFormView({
              className="sr-only peer"
              checked={generateTransaction}
              onChange={(e) => setGenerateTransaction(e.target.checked)}
+             aria-label="Contabilizar no financeiro"
            />
            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-500 dark:peer-checked:bg-emerald-400 border-2 border-transparent"></div>
         </label>
@@ -984,19 +1083,23 @@ export default function PurchaseFormView({
             Total
           </p>
           <p className="text-2xl font-black text-white leading-none">
-            R$ {total.toFixed(0)}
+            R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={onCancel}
             className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-rose-500 transition-colors"
+            aria-label="Cancelar"
+            title="Cancelar"
           >
             <Trash2 size={20} strokeWidth={2.5} />
           </button>
           <button
             onClick={handleSave}
             className="h-12 px-6 rounded-full bg-white text-slate-900 font-black uppercase tracking-widest text-[11px] flex items-center gap-2 hover:bg-emerald-400 hover:text-white transition-all"
+            aria-label="Finalizar compra"
+            title="Finalizar"
           >
             <Save size={16} strokeWidth={3} /> Finalizar
           </button>
@@ -1028,6 +1131,8 @@ export default function PurchaseFormView({
               <button 
                 onClick={() => setShowProductModal(false)} 
                 className="w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"
+                aria-label="Fechar"
+                title="Fechar"
               >
                 <X size={20} />
               </button>
@@ -1044,6 +1149,8 @@ export default function PurchaseFormView({
                    className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl pl-12 pr-4 py-4 text-sm font-bold placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-indigo-500/10 transition-all text-slate-800 dark:text-white"
                    value={productSearchQuery}
                    onChange={(e) => setProductSearchQuery(e.target.value)}
+                   aria-label="Pesquisar produto"
+                   title="Pesquisar"
                  />
                </div>
             </div>
@@ -1065,6 +1172,8 @@ export default function PurchaseFormView({
                           ? "bg-slate-50/50 dark:bg-slate-800/30 border-transparent opacity-50 cursor-not-allowed" 
                           : "hover:bg-slate-50 dark:hover:bg-slate-800/50 border-transparent hover:border-slate-200 dark:hover:border-slate-700 bg-transparent active:scale-[0.98]"
                         }`}
+                        aria-label={`Selecionar produto ${p.name}`}
+                        title={p.name}
                       >
                         <div className="flex items-center gap-4">
                           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isAdded ? 'bg-slate-100 dark:bg-slate-800' : 'bg-indigo-50 dark:bg-indigo-900/20'}`}>

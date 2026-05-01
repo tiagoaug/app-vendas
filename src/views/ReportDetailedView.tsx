@@ -98,6 +98,7 @@ export default function ReportDetailedView({
        })
        .map((p: any) => ({
            id: p.id,
+           displayId: p.batchNumber || p.id,
            supplierName: people.find(pe => pe.id === p.supplierId)?.name || 'Desconhecido',
            total: p.total,
            balance: p.balance || (p.total - (p.paymentHistory || []).reduce((acc: number, pay: any) => acc + pay.amount, 0)),
@@ -254,8 +255,8 @@ export default function ReportDetailedView({
       const body = salesByPeriodData.map(r => [
         r.period,
         r.count.toString(),
-        `R$ ${r.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-        `R$ ${r.pending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        `R$ ${r.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `R$ ${r.pending.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       ]);
       autoTable(doc, { startY: 40, head, body, theme: 'grid' });
     } else if (reportId === 'clientes-mais-compram') {
@@ -264,7 +265,7 @@ export default function ReportDetailedView({
         (i + 1).toString(),
         r.name,
         r.count.toString(),
-        `R$ ${r.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        `R$ ${r.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       ]);
       autoTable(doc, { startY: 40, head, body, theme: 'grid' });
     } else if (reportId === 'produtos-curva-a') {
@@ -273,7 +274,7 @@ export default function ReportDetailedView({
         (i + 1).toString(),
         r.name,
         r.quantity.toString(),
-        `R$ ${r.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        `R$ ${r.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
         r.classification
       ]);
       autoTable(doc, { startY: 40, head, body, theme: 'grid' });
@@ -281,18 +282,18 @@ export default function ReportDetailedView({
       const head = [['Período', 'Receitas', 'Despesas', 'Saldo (Lucro Líquido)']];
       const body = financialData.map(r => [
         r.period,
-        `R$ ${r.income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-        `R$ ${r.expense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-        `R$ ${r.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        `R$ ${r.income.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `R$ ${r.expense.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `R$ ${r.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       ]);
       autoTable(doc, { startY: 40, head, body, theme: 'grid' });
     } else if (reportId === 'dividas-fornecedor') {
       const head = [['Fornecedor', 'ID', 'Status', 'Saldo']];
       const body = dividasFornecedorData.map(r => [
         r.supplierName,
-        r.id.substring(0,8),
+        r.displayId,
         r.isAccounting ? 'Contábil' : 'Não Contábil',
-        `R$ ${r.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        `R$ ${r.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       ]);
       autoTable(doc, { startY: 40, head, body, theme: 'grid' });
     } else if (reportId === 'informacao-estoque') {
@@ -301,11 +302,11 @@ export default function ReportDetailedView({
         r.reference,
         r.color,
         r.quantity.toString(),
-        `R$ ${r.costPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-        `R$ ${r.totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        `R$ ${r.costPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `R$ ${r.totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
       ]);
-      body.push(['', '', '', 'Total Compra:', `R$ ${stockInfoTotals.cost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`]);
-      body.push(['', '', '', 'Total Venda:', `R$ ${stockInfoTotals.sale.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`]);
+      body.push(['', '', '', 'Total Compra:', `R$ ${stockInfoTotals.cost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
+      body.push(['', '', '', 'Total Venda:', `R$ ${stockInfoTotals.sale.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`]);
       autoTable(doc, { startY: 40, head, body, theme: 'grid' });
     }
 
@@ -315,11 +316,21 @@ export default function ReportDetailedView({
   return (
     <div className={`flex flex-col h-full bg-[#f8f9fa] dark:bg-slate-950 pb-32 ${isDarkMode ? 'text-white' : 'text-slate-900'} overflow-y-auto`}>
       <div className="flex justify-between items-center px-4 pt-6 pb-2 sticky top-0 bg-[#f8f9fa] dark:bg-slate-950 z-10 w-full">
-         <button onClick={onBack} className={`p-2 rounded-full ${isDarkMode ? 'bg-slate-900 text-slate-400' : 'bg-white text-slate-500'} shadow-sm`}>
+         <button
+           onClick={onBack}
+           title="Voltar"
+           aria-label="Voltar para a tela anterior"
+           className={`p-2 rounded-full ${isDarkMode ? 'bg-slate-900 text-slate-400' : 'bg-white text-slate-500'} shadow-sm`}
+         >
            <ArrowLeft size={20} />
          </button>
          <h1 className="text-xl font-black">{reportTitle}</h1>
-         <button onClick={exportPDF} className="p-2 rounded-full bg-indigo-600 text-white shadow-md shadow-indigo-600/30">
+         <button
+           onClick={exportPDF}
+           title="Exportar PDF"
+           aria-label="Exportar relatório para PDF"
+           className="p-2 rounded-full bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+         >
             <Download size={18} />
          </button>
       </div>
@@ -336,6 +347,8 @@ export default function ReportDetailedView({
                     <input 
                         type="date" 
                         value={startDate}
+                        title="Data Inicial"
+                        placeholder="Data Inicial"
                         onChange={(e) => setStartDate(e.target.value)}
                         className={`w-full p-3 rounded-xl border text-xs font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
                     />
@@ -346,6 +359,8 @@ export default function ReportDetailedView({
                     <input 
                         type="date" 
                         value={endDate}
+                        title="Data Final"
+                        placeholder="Data Final"
                         onChange={(e) => setEndDate(e.target.value)}
                         className={`w-full p-3 rounded-xl border text-xs font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
                     />
@@ -355,6 +370,7 @@ export default function ReportDetailedView({
                     <input 
                         type="text" 
                         placeholder="Buscar cliente..."
+                        title="Buscar Cliente"
                         value={customerSearch}
                         onChange={(e) => setCustomerSearch(e.target.value)}
                         className={`flex-1 min-w-[200px] p-3 rounded-xl border text-xs font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
@@ -364,6 +380,7 @@ export default function ReportDetailedView({
                     <input 
                         type="text" 
                         placeholder="Buscar modelo..."
+                        title="Buscar Modelo"
                         value={modelSearch}
                         onChange={(e) => setModelSearch(e.target.value)}
                         className={`flex-1 min-w-[200px] p-3 rounded-xl border text-xs font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
@@ -382,6 +399,7 @@ export default function ReportDetailedView({
                     </div>
                     <select 
                         value={accountingFilter}
+                        title="Filtrar por Tipo Contábil"
                         onChange={(e) => setAccountingFilter(e.target.value as any)}
                         className={`flex-1 min-w-[150px] p-3 rounded-2xl border text-xs font-bold ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-700'}`}
                     >
@@ -414,20 +432,20 @@ export default function ReportDetailedView({
                                     <td className="p-3 text-xs font-bold">{r.reference}</td>
                                     <td className="p-3 text-xs font-bold">{r.color}</td>
                                     <td className="p-3 text-xs text-right font-bold text-slate-500">{r.quantity}</td>
-                                    <td className="p-3 text-xs text-right font-bold text-slate-500">R$ {r.costPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                                    <td className="p-3 text-xs text-right font-black text-indigo-500">R$ {r.totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                    <td className="p-3 text-xs text-right font-bold text-slate-500">R$ {r.costPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                    <td className="p-3 text-xs text-right font-black text-indigo-500">R$ {r.totalCost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                 </tr>
                             ))}
                             {stockInfoData.length > 0 && (
                                 <tr className="border-t-2 dark:border-slate-700">
                                     <td colSpan={4} className="p-3 text-xs font-black text-right text-slate-500">Total Compra:</td>
-                                    <td className="p-3 text-xs font-black text-right text-indigo-600">R$ {stockInfoTotals.cost.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                    <td className="p-3 text-xs font-black text-right text-indigo-600">R$ {stockInfoTotals.cost.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                 </tr>
                             )}
                                {stockInfoData.length > 0 && (
                                 <tr className="border-t-2 dark:border-slate-700">
                                     <td colSpan={4} className="p-3 text-xs font-black text-right text-slate-500">Total Venda:</td>
-                                    <td className="p-3 text-xs font-black text-right text-emerald-600">R$ {stockInfoTotals.sale.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                    <td className="p-3 text-xs font-black text-right text-emerald-600">R$ {stockInfoTotals.sale.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                 </tr>
                             )}
                             {stockInfoData.length === 0 && (
@@ -454,9 +472,9 @@ export default function ReportDetailedView({
                             {dividasFornecedorData.map((r, i) => (
                                 <tr key={r.id} className={`border-b last:border-0 dark:border-slate-800 ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}>
                                     <td className="p-3 text-xs font-bold">{r.supplierName}</td>
-                                    <td className="p-3 text-[10px] font-bold text-slate-500">{r.id.substring(0,8)}...</td>
+                                    <td className="p-3 text-[10px] font-bold text-slate-500">{r.displayId}</td>
                                     <td className="p-3 text-[10px] font-bold text-slate-500">{r.isAccounting ? 'Contábil' : 'Não Contábil'}</td>
-                                    <td className="p-3 text-xs text-right font-black text-rose-500">R$ {r.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                    <td className="p-3 text-xs text-right font-black text-rose-500">R$ {r.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                 </tr>
                             ))}
                             {dividasFornecedorData.length === 0 && (
@@ -484,9 +502,9 @@ export default function ReportDetailedView({
                                 <tr key={i} className={`border-b last:border-0 dark:border-slate-800 ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}>
                                     <td className="p-3 text-xs font-bold">{r.period}</td>
                                     <td className="p-3 text-xs text-right font-bold text-slate-500">{r.count}</td>
-                                    <td className="p-3 text-xs text-right font-black text-indigo-500">R$ {r.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                    <td className="p-3 text-xs text-right font-black text-indigo-500">R$ {r.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                     <td className="p-3 text-xs text-right font-bold text-rose-500">
-                                        {r.pending > 0 ? `R$ ${r.pending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-'}
+                                        {r.pending > 0 ? `R$ ${r.pending.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                     </td>
                                 </tr>
                             ))}
@@ -517,7 +535,7 @@ export default function ReportDetailedView({
                                     <td className="p-3 text-xs font-bold text-slate-400">{i + 1}º</td>
                                     <td className="p-3 text-xs font-bold">{r.name}</td>
                                     <td className="p-3 text-xs text-right font-bold text-slate-500">{r.count}</td>
-                                    <td className="p-3 text-xs text-right font-black text-emerald-500">R$ {r.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                    <td className="p-3 text-xs text-right font-black text-emerald-500">R$ {r.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                 </tr>
                             ))}
                             {topCustomersData.length === 0 && (
@@ -559,7 +577,7 @@ export default function ReportDetailedView({
                                             {r.classification}
                                         </span>
                                     </td>
-                                    <td className="p-3 text-xs text-right font-black text-amber-500">R$ {r.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                    <td className="p-3 text-xs text-right font-black text-amber-500">R$ {r.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                 </tr>
                             ))}
                             {curvaAData.length === 0 && (
@@ -587,9 +605,9 @@ export default function ReportDetailedView({
                             {financialData.map((r, i) => (
                                 <tr key={i} className={`border-b last:border-0 dark:border-slate-800 ${isDarkMode ? 'hover:bg-slate-800' : 'hover:bg-slate-50'}`}>
                                     <td className="p-3 text-xs font-bold">{r.period}</td>
-                                    <td className="p-3 text-xs text-right font-bold text-emerald-500">R$ {r.income.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                                    <td className="p-3 text-xs text-right font-bold text-rose-500">R$ {r.expense.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
-                                    <td className={`p-3 text-xs text-right font-black ${r.balance >= 0 ? 'text-blue-500' : 'text-rose-600'}`}>R$ {r.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+                                    <td className="p-3 text-xs text-right font-bold text-emerald-500">R$ {r.income.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                    <td className="p-3 text-xs text-right font-bold text-rose-500">R$ {r.expense.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                    <td className={`p-3 text-xs text-right font-black ${r.balance >= 0 ? 'text-blue-500' : 'text-rose-600'}`}>R$ {r.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                                 </tr>
                             ))}
                             {financialData.length === 0 && (
