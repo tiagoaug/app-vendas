@@ -643,6 +643,17 @@ export default function DashboardView({
                     </>
                   )}
                 </div>
+
+                {/* Footer com Somas */}
+                <div className={`mt-2 pt-3 border-t flex justify-between items-center ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total do Período</p>
+                  <p className={`text-[13px] font-black ${customerDashboardTab === 'DEBITS' ? 'text-rose-500' : 'text-emerald-500'}`}>
+                    R$ {(customerDashboardTab === 'DEBITS' 
+                      ? customersWithDebts.reduce((acc, item) => acc + item.totalDebt, 0)
+                      : customersWithCredits.reduce((acc, person) => acc + (person.credit || 0), 0)
+                    ).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
+                </div>
               </div>
             );
 
@@ -695,6 +706,17 @@ export default function DashboardView({
                       {suppliersWithCredits.length === 0 && <p className="text-[10px] text-center text-slate-400 py-4">Nenhum crédito com fornecedor.</p>}
                     </>
                   )}
+                </div>
+
+                {/* Footer com Somas */}
+                <div className={`mt-2 pt-3 border-t flex justify-between items-center ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total do Período</p>
+                  <p className={`text-[13px] font-black ${supplierDashboardTab === 'DEBITS' ? 'text-rose-500' : 'text-emerald-500'}`}>
+                    R$ {(supplierDashboardTab === 'DEBITS' 
+                      ? pendingPurchases.reduce((acc, p) => acc + p.debt, 0)
+                      : suppliersWithCredits.reduce((acc, p) => acc + (p.credit || 0), 0)
+                    ).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </p>
                 </div>
               </div>
             );

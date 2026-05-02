@@ -14,6 +14,7 @@ interface CardItemProps {
   card: DashboardCardConfig;
   isDarkMode: boolean;
   onToggleVisibility: (id: string) => void;
+  key?: string | number;
 }
 
 function CardItem({ card, isDarkMode, onToggleVisibility }: CardItemProps) {
@@ -39,7 +40,6 @@ function CardItem({ card, isDarkMode, onToggleVisibility }: CardItemProps) {
             e.preventDefault();
             controls.start(e);
           }}
-          style={{ touchAction: 'none' }}
           className={`p-3 rounded-xl cursor-grab active:cursor-grabbing transition-colors select-none touch-none ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-100 hover:bg-slate-200'} text-slate-400`}
         >
           <GripVertical size={20} />
