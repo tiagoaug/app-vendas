@@ -44,7 +44,7 @@ export default function AccountsView({ accounts, onAdd, onEdit, onDelete, onAdju
   };
 
   return (
-    <div className="flex flex-col gap-6 pb-32 p-4">
+    <div className="flex flex-col gap-6 pb-64 p-2">
       <ConfirmDialog
         isOpen={isConfirmOpen}
         title="Excluir Conta?"
@@ -60,7 +60,7 @@ export default function AccountsView({ accounts, onAdd, onEdit, onDelete, onAdju
       />
       {/* Header */}
       <div className="flex flex-col gap-1">
-        <h2 className="text-3xl font-black text-slate-800 dark:text-white">CONTAS</h2>
+        <h2 className="text-3xl font-black text-slate-800 dark:text-white uppercase">Gerenciamento de Contas</h2>
         <p className="text-sm text-slate-500">Controle financeiro e fluxo entre contas</p>
       </div>
 

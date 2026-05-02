@@ -177,6 +177,8 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                               type="number"
                               className="w-full bg-white dark:bg-slate-900 border-none rounded-md p-1.5 text-center text-[10px] font-bold"
                               value={v.stock[size] !== undefined ? v.stock[size] : ''}
+                              title={`Estoque para tamanho ${size}`}
+                              placeholder="0"
                               onChange={(e) => {
                                 const val = e.target.value;
                                 const newStock = { ...v.stock, [size]: val === '' ? '' as any : parseInt(val, 10) };
@@ -191,6 +193,8 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                               step="0.01"
                               className="w-full bg-white dark:bg-slate-900 border-none rounded-md p-1.5 text-center text-[10px] font-bold"
                               value={v.sizePrices?.[size]?.cost ?? costPrice}
+                              title={`Preço de custo para tamanho ${size}`}
+                              placeholder="0.00"
                               onChange={(e) => {
                                 const newPrices = { ...v.sizePrices };
                                 newPrices[size] = { 
@@ -208,6 +212,8 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                               step="0.01"
                               className="w-full bg-white dark:bg-slate-900 border-none rounded-md p-1.5 text-center text-[10px] font-bold text-indigo-600"
                               value={v.sizePrices?.[size]?.sale ?? salePrice}
+                              title={`Preço de venda para tamanho ${size}`}
+                              placeholder="0.00"
                               onChange={(e) => {
                                 const newPrices = { ...v.sizePrices };
                                 newPrices[size] = { 
@@ -434,6 +440,7 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                         <select 
                           className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-5 py-4 text-xs font-black appearance-none cursor-pointer text-slate-700 dark:text-slate-300 pr-10"
                           value={defaultGridId}
+                          title="Selecionar grade de tamanhos padrão"
                           onChange={(e) => setDefaultGridId(e.target.value)}
                         >
                           {grids.map(g => <option key={g.id} value={g.id} className="dark:bg-slate-900">{g.name} ({g.sizes.join('/')})</option>)}
@@ -494,6 +501,7 @@ export default function ProductFormView({ productId, products, grids, suppliers,
               <select 
                 className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl px-3 py-3.5 text-[10px] font-bold appearance-none cursor-pointer text-slate-700 dark:text-slate-300"
                 value={defaultGridId}
+                title="Selecionar grade padrão"
                 onChange={(e) => setDefaultGridId(e.target.value)}
               >
                 {grids.map(g => <option key={g.id} value={g.id} className="dark:bg-slate-900">{g.name}</option>)}
@@ -506,6 +514,8 @@ export default function ProductFormView({ productId, products, grids, suppliers,
               type="number" 
               className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl px-4 py-3.5 text-xs font-bold text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500/10"
               value={minStockInBoxes}
+              title="Estoque mínimo em caixas"
+              placeholder="0"
               onChange={(e) => setMinStockInBoxes(e.target.value)}
             />
           </div>
@@ -522,6 +532,7 @@ export default function ProductFormView({ productId, products, grids, suppliers,
                    type="date"
                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl px-3 py-3 text-[10px] font-bold text-slate-900 dark:text-slate-100"
                    value={adjustmentDate}
+                   title="Data de reajuste"
                    onChange={(e) => setAdjustmentDate(e.target.value)}
                  />
               </div>

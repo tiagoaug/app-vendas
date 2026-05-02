@@ -12,7 +12,8 @@ import {
   Boxes,
   Moon,
   Sun,
-  ChevronRight
+  ChevronRight,
+  Layout
 } from 'lucide-react';
 import { ViewType } from '../types';
 
@@ -48,11 +49,17 @@ export default function SettingsView({ onNavigate, isDarkMode, toggleDarkMode }:
         { id: ViewType.REPORTS, label: "Relatórios Avançados", icon: <BarChart3 size={24} />, color: "text-slate-600 dark:text-slate-400" },
         { id: ViewType.BACKUP, label: "Backup & Formatação", icon: <Database size={24} />, color: "text-gray-600 dark:text-gray-400" },
       ]
+    },
+    {
+      title: "Personalização",
+      items: [
+        { id: ViewType.DASHBOARD_CONFIG, label: "Organizar Dashboard", icon: <Layout size={24} />, color: "text-indigo-600 dark:text-indigo-400" },
+      ]
     }
   ];
 
   return (
-    <div className="flex flex-col gap-8 pb-10">
+    <div className="flex flex-col gap-8 pb-10 h-full overflow-y-auto force-scrollbar">
       {/* Theme Toggle */}
       <section className={`p-4 rounded-3xl border shadow-sm flex items-center justify-between ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
         <div className="flex items-center gap-3">
@@ -65,6 +72,8 @@ export default function SettingsView({ onNavigate, isDarkMode, toggleDarkMode }:
           </div>
         </div>
         <button 
+          title="Alternar Tema"
+          aria-label={`Mudar para modo ${isDarkMode ? 'diurno' : 'noturno'}`}
           onClick={toggleDarkMode}
           className={`w-12 h-6 rounded-full relative transition-colors duration-300 ${isDarkMode ? 'bg-indigo-600' : 'bg-slate-200'}`}
         >

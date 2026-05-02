@@ -20,11 +20,12 @@ import {
   CreditCard,
   BarChart3,
   Database,
-  Boxes
+  Boxes,
+  User as UserIcon
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { auth, db, signInWithGoogle, logout } from "./lib/firebase";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
 import { doc, collection, query, where, getDocs } from "firebase/firestore";
 import { firebaseService } from "./services/firebaseService";
 import { financeService } from "./services/financeService";
@@ -51,6 +52,8 @@ import {
   SalePayment,
   FamilyMember,
   Budget,
+  DashboardConfig,
+  DashboardCardConfig,
 } from "./types";
 import {
   MOCK_PRODUCTS,
@@ -86,15 +89,16 @@ import BackupView from "./views/BackupView";
 import AccountsView from "./views/AccountsView";
 import StockView from "./views/StockView";
 import PersonDetailView from "./views/PersonDetailView";
-import PersonalFinancialView from "./views/PersonalFinancialView";
 import LoginView from "./views/LoginView";
+import DashboardConfigView from "./views/DashboardConfigView";
+import PersonalFinancialView from "./views/PersonalFinancialView";
 
 // Modals
 import AccountModal from "./components/AccountModal";
 import PaymentMethodModal from "./components/PaymentMethodModal";
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewType>(ViewType.DASHBOARD);
   const [history, setHistory] = useState<ViewType[]>([ViewType.DASHBOARD]);
@@ -121,6 +125,24 @@ export default function App() {
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [personalContacts, setPersonalContacts] = useState<Person[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [dashboardConfig, setDashboardConfig] = useState<DashboardConfig | null>(null);
+
+  const defaultDashboardConfig: DashboardConfig = {
+    cards: [
+      { id: 'balance', label: 'Saldo Consolidado', visible: true, order: 0 },
+      { id: 'cash_flow', label: 'Balanço Mensal', visible: true, order: 1 },
+      { id: 'receivables', label: 'A Receber (Vendas)', visible: true, order: 2 },
+      { id: 'stock_alerts', label: 'Alertas de Estoque', visible: true, order: 3 },
+      { id: 'customers', label: 'Relacionamento Clientes', visible: true, order: 4 },
+      { id: 'suppliers', label: 'Relacionamento Fornecedores', visible: true, order: 5 },
+      { id: 'debt_management', label: 'Gestão de Dívidas', visible: true, order: 6 },
+      { id: 'stock_value', label: 'Patrimônio em Estoque', visible: true, order: 7 },
+      { id: 'estimated_profit', label: 'Lucro Total Estimado', visible: true, order: 8 },
+      { id: 'checks', label: 'Relatório de Cheques', visible: true, order: 9 },
+      { id: 'activity', label: 'Atividade Recente', visible: true, order: 10 },
+      { id: 'monthly_profit_detailed', label: 'Análise de Lucro Detalhada', visible: true, order: 11 },
+    ]
+  };
 
   // Firebase Subscriptions
   useEffect(() => {
@@ -206,6 +228,47 @@ export default function App() {
       "budgets",
       setBudgets,
     );
+    const unsubDashboardConfig = firebaseService.subscribeToCollection<DashboardConfig>(
+      "dashboard_config",
+      (data) => {
+        // Ordenar por updatedAt para garantir que pegamos a versão mais recente
+        const sortedData = [...data].sort((a: any, b: any) => {
+          const timeA = a.updatedAt?.toMillis?.() || a.updatedAt?.seconds || 0;
+          const timeB = b.updatedAt?.toMillis?.() || b.updatedAt?.seconds || 0;
+          return timeB - timeA;
+        });
+
+        const mainConfig = sortedData.find(c => c.id === 'main_config') || sortedData[0];
+        if (mainConfig) {
+          // Reconciliar a configuração carregada com a padrão para garantir que novos cards apareçam
+          const defaultCards = defaultDashboardConfig.cards;
+          const currentCards = mainConfig.cards || [];
+          const currentCardMap = new Map(currentCards.map(c => [c.id, c]));
+          
+          const reconciledCards = defaultCards.map(defCard => {
+            const existing = currentCardMap.get(defCard.id);
+            if (existing && typeof existing === 'object') {
+              return { ...defCard, ...existing };
+            }
+            return defCard;
+          });
+
+          // Incluir cards que estão no Firestore mas não estão no default (suporte a IDs antigos ou customizados)
+          const defaultIds = new Set(defaultCards.map(c => c.id));
+          const extraCards = currentCards.filter(c => !defaultIds.has(c.id));
+          
+          const combinedCards = [...reconciledCards, ...extraCards];
+
+          // Garantir que a ordem seja respeitada, sem buracos e sequencial
+          combinedCards.sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+          const finalCards = combinedCards.map((card, index) => ({ ...card, order: index }));
+
+          setDashboardConfig({ ...mainConfig, cards: finalCards });
+        } else {
+          setDashboardConfig(defaultDashboardConfig);
+        }
+      }
+    );
 
     return () => {
       unsubProducts();
@@ -221,6 +284,7 @@ export default function App() {
       unsubFamilyMembers();
       unsubPersonalContacts();
       unsubBudgets();
+      unsubDashboardConfig();
     };
   }, [user]);
 
@@ -486,8 +550,30 @@ export default function App() {
             transactions={transactions}
             accounts={accounts}
             people={people}
-            onCheckStatusChange={handleCheckStatusChange}
+            onAddSale={() => resetTo(ViewType.SALE_FORM)}
+            onUpdateCheckStatus={handleCheckStatusChange}
+            isDarkMode={isDarkMode}
+            categories={categories}
+            dashboardConfig={dashboardConfig || defaultDashboardConfig}
             onNavigate={navigateTo}
+          />
+        );
+      case ViewType.DASHBOARD_CONFIG:
+        return (
+          <DashboardConfigView 
+            config={dashboardConfig || defaultDashboardConfig}
+            onSave={async (newConfig) => {
+              try {
+                // Use a fixed ID 'main_config' to ensure we only have one configuration document
+                const configToSave = { ...newConfig, id: 'main_config' };
+                await firebaseService.saveDocument("dashboard_config", configToSave);
+                alert("Configuração salva com sucesso!");
+              } catch (err) {
+                console.error("Error saving dashboard config:", err);
+                alert("Erro ao salvar configuração.");
+              }
+            }}
+            onBack={goBack}
             isDarkMode={isDarkMode}
           />
         );
@@ -1761,11 +1847,12 @@ export default function App() {
     if (
       [
         ViewType.FINANCIAL, 
-        ViewType.ACCOUNTS,
-        ViewType.PERSONAL_FINANCIAL
+        ViewType.ACCOUNTS
       ].includes(currentView)
     )
       return "financial";
+    if ([ViewType.PERSONAL_FINANCIAL].includes(currentView))
+      return "personal";
     if (
       [
         ViewType.SETTINGS,
@@ -1813,11 +1900,13 @@ export default function App() {
       case ViewType.FINANCIAL:
         return "Financeiro";
       case ViewType.ACCOUNTS:
-        return "Contas Correntes";
+        return "Gerenciamento de Contas";
       case ViewType.PERSONAL_FINANCIAL:
         return "Financeiro Pessoal";
       case ViewType.SETTINGS:
         return "Mais Opções";
+      case ViewType.DASHBOARD_CONFIG:
+        return "Layout do Painel";
       default:
         return "Detalhes";
     }
@@ -1846,6 +1935,7 @@ export default function App() {
       case ViewType.PAYMENT_METHODS: return <CreditCard size={24} className="text-slate-500 dark:text-slate-400" />;
       case ViewType.REPORTS: return <BarChart3 size={24} className="text-slate-500 dark:text-slate-400" />;
       case ViewType.BACKUP: return <Database size={24} className="text-slate-500 dark:text-slate-400" />;
+      case ViewType.DASHBOARD_CONFIG: return <LayoutDashboard size={24} className="text-indigo-600 dark:text-indigo-400" />;
       
       default: return <Shield size={24} className="text-blue-600 dark:text-blue-400" />;
     }
@@ -1915,7 +2005,7 @@ export default function App() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.02 }}
             transition={{ duration: 0.15 }}
-            className="p-6 h-full"
+            className="p-6 min-h-full"
           >
             {renderView()}
           </motion.div>
@@ -1951,6 +2041,13 @@ export default function App() {
           active={activeTab === "financial"}
           onClick={() => resetTo(ViewType.FINANCIAL)}
           colorClass="text-amber-500 dark:text-amber-400"
+        />
+        <TabItem
+          icon={<UserIcon size={22} />}
+          label="PESSOAL"
+          active={activeTab === "personal"}
+          onClick={() => resetTo(ViewType.PERSONAL_FINANCIAL)}
+          colorClass="text-amber-600 dark:text-amber-500"
         />
         <TabItem
           icon={<Settings size={22} />}
@@ -2010,12 +2107,12 @@ function TabItem({
       className={`flex flex-col items-center justify-center p-2 min-w-[64px] h-[64px] transition-all rounded-[20px] ${active ? "bg-slate-100 dark:bg-slate-900" : "bg-transparent"}`}
     >
       <div
-        className={`transition-all ${colorClass} ${active ? "opacity-100 scale-110" : "opacity-70 saturate-50"}`}
+        className={`transition-all ${colorClass} ${active ? "scale-110" : ""}`}
       >
         {icon}
       </div>
       <span
-        className={`text-[8px] font-bold tracking-widest mt-1 uppercase transition-all ${colorClass} ${active ? "opacity-100" : "opacity-70 saturate-50"}`}
+        className={`text-[8px] font-bold tracking-widest mt-1 uppercase transition-all ${colorClass} ${active ? "opacity-100" : "opacity-90"}`}
       >
         {label}
       </span>

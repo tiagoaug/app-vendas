@@ -209,7 +209,7 @@ export default function FinancialView({
   };
 
   return (
-    <div className="flex flex-col gap-6 pb-32">
+    <div className="flex flex-col gap-6 pb-32 h-full overflow-y-auto force-scrollbar">
       {selectedPurchase && (
         <PartialPaymentModal 
           isOpen={isPaymentModalOpen}
@@ -373,26 +373,6 @@ export default function FinancialView({
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <motion.button 
-              onClick={() => {
-                // This will be handled in App.tsx by changing the view
-                window.dispatchEvent(new CustomEvent('change-view', { detail: 'PERSONAL_FINANCIAL' }));
-              }}
-              animate={{ 
-                scale: [1, 1.05, 1],
-                boxShadow: ["0px 0px 0px rgba(245, 158, 11, 0)", "0px 0px 15px rgba(245, 158, 11, 0.4)", "0px 0px 0px rgba(245, 158, 11, 0)"],
-                color: ["#fbbf24", "#f59e0b", "#fbbf24"]
-              }}
-              transition={{ 
-                duration: 2, 
-                repeat: Infinity,
-                ease: "easeInOut" 
-              }}
-              className={`flex flex-col items-center justify-center gap-1 px-4 rounded-2xl transition-all shadow-sm active:scale-95 border ${isDarkMode ? 'bg-amber-950/20 border-amber-900 text-amber-500' : 'bg-amber-50 border-amber-100 text-amber-500'}`}
-            >
-              <User size={20} strokeWidth={3} />
-              <span className="text-[7px] font-black uppercase tracking-tight">Pessoal</span>
-            </motion.button>
           </div>
         </div>
 

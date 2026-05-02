@@ -115,6 +115,8 @@ export default function PurchasesView({
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-slate-800 dark:text-white">Observação</h3>
               <button
+                title="Fechar"
+                aria-label="Fechar observação"
                 onClick={() => setSelectedNote(null)}
                 className="p-1 text-slate-400 hover:text-slate-600"
               >

@@ -259,7 +259,19 @@ export enum ViewType {
   PERSON_DETAIL = 'PERSON_DETAIL',
   PERSONAL_FINANCIAL = 'PERSONAL_FINANCIAL',
   REPORT_DETAILED = 'REPORT_DETAILED',
+  DASHBOARD_CONFIG = 'DASHBOARD_CONFIG',
 }
+
+export type DashboardCardConfig = {
+  id: string;
+  label: string;
+  visible: boolean;
+  order: number;
+};
+
+export type DashboardConfig = {
+  cards: DashboardCardConfig[];
+};
 
 export type FamilyMember = {
   id: string;

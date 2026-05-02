@@ -149,7 +149,7 @@ export default function SalesView({
   };
 
   return (
-    <div className="flex flex-col gap-6 h-full pb-44 px-1 overflow-y-auto no-scrollbar">
+    <div className="flex flex-col gap-6 h-full pb-44 px-1 overflow-y-auto force-scrollbar">
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <div>

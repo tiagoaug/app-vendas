@@ -49,4 +49,39 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  .force-scrollbar {
+    overflow-y: scroll !important;
+    scrollbar-width: auto !important;
+    scrollbar-color: #4f46e5 rgba(0, 0, 0, 0.05) !important;
+  }
+
+  .force-scrollbar::-webkit-scrollbar {
+    width: 6px !important;
+    height: 6px !important;
+    display: block !important;
+  }
+
+  .force-scrollbar::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.02) !important;
+    border-radius: 10px;
+  }
+
+  .force-scrollbar::-webkit-scrollbar-thumb {
+    background: #4f46e5 !important;
+    border-radius: 10px;
+    border: 1px solid transparent;
+  }
+
+  .dark .force-scrollbar::-webkit-scrollbar-thumb {
+    background: #818cf8 !important;
+  }
+
+  @keyframes spin-slow {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .animate-spin-slow {
+    animation: spin-slow 3s linear infinite;
+  }
 }

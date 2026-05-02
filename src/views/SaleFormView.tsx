@@ -864,6 +864,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                                         <button 
                                           onClick={() => updateVariation(index, v.id, (varState.quantity || 0) - 1, varState.price, size)}
                                           className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500"
+                                          title="Diminuir"
+                                          aria-label="Diminuir quantidade"
                                         >
                                           <Minus size={12} strokeWidth={3} />
                                         </button>
@@ -871,6 +873,9 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                                           type="number"
                                           className="flex-1 w-full bg-transparent border-none p-0 text-center font-black text-[11px] text-slate-800 dark:text-white focus:ring-0"
                                           value={varState.quantity}
+                                          title="Quantidade"
+                                          aria-label="Quantidade"
+                                          placeholder="0"
                                           onChange={(e) => {
                                             const val = e.target.value === "" ? 0 : parseInt(e.target.value);
                                             updateVariation(index, v.id, val || 0, varState.price, size);
@@ -879,6 +884,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                                         <button 
                                           onClick={() => updateVariation(index, v.id, (varState.quantity || 0) + 1, varState.price, size)}
                                           className="w-6 h-6 rounded-lg flex items-center justify-center text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/50"
+                                          title="Aumentar"
+                                          aria-label="Aumentar quantidade"
                                         >
                                           <Plus size={12} strokeWidth={3} />
                                         </button>
@@ -913,21 +920,27 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                                   step="0.01"
                                   className="w-16 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-lg py-1 px-2 text-[10px] font-black text-right"
                                   value={varState.price}
+                                  title="Preço unitário"
+                                  aria-label="Preço unitário"
+                                  placeholder="0.00"
                                   onChange={(e) => updateVariation(index, v.id, varState.quantity, parseFloat(e.target.value) || 0)}
                                 />
                               </div>
                               <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl p-1">
-                                <button onClick={() => updateVariation(index, v.id, (varState.quantity || 0) - 1, varState.price)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500"><Minus size={14} /></button>
+                                <button onClick={() => updateVariation(index, v.id, (varState.quantity || 0) - 1, varState.price)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-rose-500" title="Diminuir" aria-label="Diminuir quantidade"><Minus size={14} /></button>
                                 <input
                                   type="number"
                                   className="w-8 bg-transparent border-none p-0 text-center font-black text-xs text-slate-800 dark:text-white focus:ring-0"
                                   value={varState.quantity}
+                                  title="Quantidade"
+                                  aria-label="Quantidade"
+                                  placeholder="0"
                                   onChange={(e) => {
                                     const val = e.target.value === "" ? 0 : parseInt(e.target.value);
                                     updateVariation(index, v.id, val || 0, varState.price);
                                   }}
                                 />
-                                <button onClick={() => updateVariation(index, v.id, (varState.quantity || 0) + 1, varState.price)} className="w-7 h-7 rounded-lg flex items-center justify-center text-indigo-500"><Plus size={14} /></button>
+                                <button onClick={() => updateVariation(index, v.id, (varState.quantity || 0) + 1, varState.price)} className="w-7 h-7 rounded-lg flex items-center justify-center text-indigo-500" title="Aumentar" aria-label="Aumentar quantidade"><Plus size={14} /></button>
                               </div>
                             </div>
                           </div>
@@ -996,6 +1009,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                                 <button 
                                   onClick={() => setPaymentHistory(paymentHistory.filter(p => p.id !== payment.id))}
                                   className="p-1 opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition-all"
+                                  title="Remover Pagamento"
+                                  aria-label="Remover este pagamento do histórico"
                                 >
                                   <Minus size={12} />
                                 </button>
@@ -1054,6 +1069,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                 onClick={handleWhatsApp}
                 className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${customerId ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-300'}`}
                 disabled={!customerId}
+                title="Compartilhar via WhatsApp"
+                aria-label="Compartilhar pedido via WhatsApp"
               >
                 <MessageSquare size={20} />
               </button>
@@ -1078,6 +1095,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
               <button 
                 onClick={() => setShowWhatsAppModal(false)} 
                 className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"
+                title="Fechar"
+                aria-label="Fechar prévia do WhatsApp"
               >
                 <X size={24} />
               </button>
@@ -1156,6 +1175,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
               <button 
                 onClick={() => setShowProductModal(false)} 
                 className="w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"
+                title="Fechar"
+                aria-label="Fechar seleção de produto"
               >
                 <X size={20} />
               </button>
@@ -1225,7 +1246,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                 <h2 className="text-sm font-black uppercase tracking-widest text-slate-800 dark:text-white">Novo Recebimento</h2>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Registrar pagamento parcial ou total</p>
               </div>
-              <button onClick={() => setShowPaymentModal(false)} className="w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors">
+              <button onClick={() => setShowPaymentModal(false)} className="w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors" title="Fechar" aria-label="Fechar registro de recebimento">
                 <X size={20} />
               </button>
             </div>
@@ -1267,6 +1288,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                     <select 
                       className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-3.5 text-[11px] font-black uppercase appearance-none text-slate-700 dark:text-slate-200"
                       value={partialPaymentMethodId}
+                      title="Selecionar método de pagamento"
                       onChange={(e) => setPartialPaymentMethodId(e.target.value)}
                     >
                       <option value="">MESMO DO PEDIDO</option>
@@ -1278,6 +1300,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
                     <select 
                       className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-3.5 text-[11px] font-black uppercase appearance-none text-slate-700 dark:text-slate-200"
                       value={partialPaymentAccountId}
+                      title="Selecionar conta de destino"
                       onChange={(e) => setPartialPaymentAccountId(e.target.value)}
                     >
                       <option value="">MESMA DO PEDIDO</option>

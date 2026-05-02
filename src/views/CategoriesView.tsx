@@ -48,7 +48,7 @@ export default function CategoriesView({ categories, onAdd, onEdit, onDelete, is
   };
 
   return (
-    <div className="flex flex-col gap-6 pb-64 min-h-screen px-4">
+    <div className="flex flex-col gap-6 pb-64 h-screen overflow-y-auto force-scrollbar px-4">
       <ConfirmDialog
         isOpen={isConfirmOpen}
         title="Excluir Categoria?"

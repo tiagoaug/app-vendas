@@ -102,8 +102,9 @@ export default function PersonalFinancialView({
   
   // Filter personal transactions
   const personalTransactions = useMemo(() => {
-    if (!personalAccount) return [];
-    return transactions.filter(t => t.accountId === personalAccount.id || t.isPersonal).sort((a, b) => b.date - a.date);
+    return transactions
+      .filter(t => (personalAccount && t.accountId === personalAccount.id) || t.isPersonal)
+      .sort((a, b) => b.date - a.date);
   }, [transactions, personalAccount]);
 
   const filteredTxs = personalTransactions.filter(t => {
@@ -176,10 +177,41 @@ export default function PersonalFinancialView({
     try {
       const from = accounts.find(a => a.id === fromId);
       if (!from || !personalAccount) return;
-      await onSaveTransaction({ type: TransactionType.EXPENSE, categoryId: 'transfer', accountId: from.id, amount, date: Date.now(), description: `Transferência para Pessoal`, status: 'COMPLETED' });
-      await onSaveTransaction({ type: TransactionType.INCOME, categoryId: 'transfer', accountId: personalAccount.id, amount, date: Date.now(), description: `Recebido da Empresa`, status: 'COMPLETED', isPersonal: true });
-      alert('Transferência realizada!');
-    } catch (err: any) { alert('Erro: ' + err.message); }
+
+      // Fallback strategy for categoryId to avoid 'transfer' literal if possible
+      const revenueCats = categories.filter(c => c.type === CategoryType.REVENUE);
+      const expenseCats = categories.filter(c => c.type === CategoryType.EXPENSE);
+      
+      const transferInCat = revenueCats.find(c => c.name.toLowerCase().includes('transfer') || c.isPersonal)?.id || revenueCats[0]?.id || 'transfer';
+      const transferOutCat = expenseCats.find(c => c.name.toLowerCase().includes('transfer'))?.id || expenseCats[0]?.id || 'transfer';
+
+      await onSaveTransaction({ 
+        type: TransactionType.EXPENSE, 
+        categoryId: transferOutCat, 
+        accountId: from.id, 
+        amount, 
+        date: Date.now(), 
+        description: `Retirada p/ Pessoal: ${from.name}`, 
+        status: 'COMPLETED',
+        isPersonal: true 
+      });
+      
+      await onSaveTransaction({ 
+        type: TransactionType.INCOME, 
+        categoryId: transferInCat, 
+        accountId: personalAccount.id, 
+        amount, 
+        date: Date.now(), 
+        description: `Recebido da Empresa (${from.name})`, 
+        status: 'COMPLETED', 
+        isPersonal: true 
+      });
+
+      alert('Transferência realizada com sucesso!');
+    } catch (err: any) { 
+      console.error(err);
+      alert('Erro ao realizar transferência: ' + err.message); 
+    }
   };
 
   return (
@@ -345,7 +377,7 @@ export default function PersonalFinancialView({
             <div className="absolute -right-20 -top-20 w-64 h-64 bg-white/5 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
             
-            <div className="absolute top-6 right-8">
+            <div className="absolute top-6 right-8 z-20">
                 <button 
                   onClick={handleTransfer} 
                   className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-lg ${
@@ -529,7 +561,7 @@ export default function PersonalFinancialView({
                 className={`py-5 rounded-[2rem] flex flex-col items-center justify-center gap-3 border transition-all ${
                   configTab === tab.id 
                     ? `${isDarkMode ? 'bg-slate-800 border-indigo-500/50 shadow-indigo-500/10' : 'bg-white border-indigo-500/20 shadow-indigo-500/10'} shadow-xl scale-[1.02]` 
-                    : `${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-transparent'} grayscale opacity-60 hover:grayscale-0 hover:opacity-100`
+                    : `${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-transparent'} hover:bg-slate-100 dark:hover:bg-slate-800`
                 }`}
               >
                 <div className={`${tab.color} text-white p-3.5 rounded-2xl shadow-lg`}>
