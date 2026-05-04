@@ -11,6 +11,8 @@ interface FinancialQueryModalProps {
   purchases: Purchase[];
   sales: Sale[];
   onSettle: (transaction: Transaction) => Promise<void>;
+  onSettlePurchase?: (purchase: Purchase) => void;
+  onSettleSale?: (sale: Sale) => void;
   isDarkMode: boolean;
 }
 
@@ -22,6 +24,8 @@ export default function FinancialQueryModal({
   purchases,
   sales,
   onSettle,
+  onSettlePurchase,
+  onSettleSale,
   isDarkMode
 }: FinancialQueryModalProps) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -44,55 +48,118 @@ export default function FinancialQueryModal({
     people.find(p => p.id === selectedPersonId), 
   [people, selectedPersonId]);
 
-  const filteredTransactions = useMemo(() => {
-    let list = transactions;
+  const unifiedItems = useMemo(() => {
+    let list: any[] = [];
 
-    // Filter by person if selected
-    if (selectedPersonId) {
-      list = list.filter(t => t.contactId === selectedPersonId || t.contactName === selectedPerson?.name);
-    } else if (searchTerm) {
-      // If no person selected, but search term exists, try to match description or IDs
+    // 1. Map Transactions
+    transactions.forEach(t => {
+      if (t.isPersonal) return;
+      
+      const matchesPerson = !selectedPersonId || (t.contactId === selectedPersonId || t.contactName === selectedPerson?.name);
       const term = searchTerm.toLowerCase();
-      list = list.filter(t => 
+      const matchesSearch = !searchTerm || (
         t.description.toLowerCase().includes(term) ||
         t.id.toLowerCase().includes(term) ||
-        t.relatedId?.toLowerCase().includes(term) ||
         t.contactName?.toLowerCase().includes(term)
       );
-    }
 
-    // Filter by status
+      if (matchesPerson && matchesSearch) {
+        list.push({
+          id: t.id,
+          date: t.date,
+          description: t.description,
+          amount: t.amount,
+          type: t.type,
+          status: t.status,
+          contactName: t.contactName || 'Sem contato',
+          itemType: 'TRANSACTION',
+          originalData: t
+        });
+      }
+    });
+
+    // 2. Map Purchases (Installments)
+    purchases.forEach(p => {
+      const matchesPerson = !selectedPersonId || p.supplierId === selectedPersonId;
+      const term = searchTerm.toLowerCase();
+      const supplier = people.find(person => person.id === p.supplierId);
+      const supplierName = supplier?.name || 'Fornecedor';
+      const matchesSearch = !searchTerm || (
+        supplierName.toLowerCase().includes(term) ||
+        (p.batchNumber || '').toLowerCase().includes(term) ||
+        (p.notes || '').toLowerCase().includes(term)
+      );
+
+      if (matchesPerson && matchesSearch && p.paymentTerm === 'INSTALLMENTS') {
+        list.push({
+          id: p.id,
+          date: p.date,
+          description: `Compra #${p.batchNumber || p.id.slice(-6).toUpperCase()}`,
+          amount: p.total,
+          type: TransactionType.EXPENSE,
+          status: p.paymentStatus === 'PAID' ? 'COMPLETED' : 'PENDING',
+          contactName: supplierName,
+          itemType: 'PURCHASE',
+          originalData: p
+        });
+      }
+    });
+
+    // 3. Map Sales (Installments)
+    sales.forEach(s => {
+      const matchesPerson = !selectedPersonId || s.customerId === selectedPersonId;
+      const term = searchTerm.toLowerCase();
+      const customerName = s.customerName || people.find(person => person.id === s.customerId)?.name || 'Cliente';
+      const matchesSearch = !searchTerm || (
+        customerName.toLowerCase().includes(term) ||
+        (s.orderNumber || '').toLowerCase().includes(term)
+      );
+
+      if (matchesPerson && matchesSearch && s.paymentTerm === 'INSTALLMENTS') {
+        list.push({
+          id: s.id,
+          date: s.date,
+          description: `Venda #${s.orderNumber || s.id.slice(-6).toUpperCase()}`,
+          amount: s.total,
+          type: TransactionType.INCOME,
+          status: s.paymentStatus === 'PAID' ? 'COMPLETED' : 'PENDING',
+          contactName: customerName,
+          itemType: 'SALE',
+          originalData: s
+        });
+      }
+    });
+
+    // Apply global filters
     if (statusFilter !== 'ALL') {
-      list = list.filter(t => t.status === statusFilter);
+      list = list.filter(item => item.status === statusFilter);
     }
-
-    // Filter by period
     if (startDate) {
       const start = new Date(startDate).getTime();
-      list = list.filter(t => t.date >= start);
+      list = list.filter(item => item.date >= start);
     }
     if (endDate) {
       const end = new Date(endDate).getTime();
-      list = list.filter(t => t.date <= end);
+      list = list.filter(item => item.date <= end);
     }
 
-    return list;
-  }, [transactions, selectedPersonId, selectedPerson, searchTerm, statusFilter, startDate, endDate]);
+    return list.sort((a, b) => b.date - a.date);
+  }, [transactions, purchases, sales, selectedPersonId, selectedPerson, searchTerm, statusFilter, startDate, endDate, people]);
 
   const stats = useMemo(() => {
-    const pendingIncome = filteredTransactions
+    const pendingIncome = unifiedItems
       .filter(t => t.type === TransactionType.INCOME && t.status === 'PENDING')
       .reduce((acc, curr) => acc + curr.amount, 0);
     
-    const pendingExpense = filteredTransactions
+    const pendingExpense = unifiedItems
       .filter(t => t.type === TransactionType.EXPENSE && t.status === 'PENDING')
       .reduce((acc, curr) => acc + curr.amount, 0);
 
-    const completedIncome = filteredTransactions
+    const completedIncome = unifiedItems
       .filter(t => t.type === TransactionType.INCOME && t.status === 'COMPLETED')
       .reduce((acc, curr) => acc + curr.amount, 0);
 
-    const completedExpense = filteredTransactions
+    const completedExpense = unifiedItems
       .filter(t => t.type === TransactionType.EXPENSE && t.status === 'COMPLETED')
       .reduce((acc, curr) => acc + curr.amount, 0);
 
@@ -100,7 +167,7 @@ export default function FinancialQueryModal({
     const movedTotal = completedIncome + completedExpense;
 
     return { pendingIncome, pendingExpense, balance, movedTotal };
-  }, [filteredTransactions]);
+  }, [unifiedItems]);
 
   if (!isOpen) return null;
 
@@ -325,11 +392,11 @@ export default function FinancialQueryModal({
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-32 sm:pb-32 custom-scrollbar">
            <div className="max-w-2xl mx-auto py-2">
               <div className="flex items-center justify-between mb-6 px-1">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 whitespace-nowrap">Resultados da Consulta ({filteredTransactions.length})</h3>
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 whitespace-nowrap">Resultados da Consulta ({unifiedItems.length})</h3>
                 <div className="h-[1px] flex-1 bg-slate-200 dark:bg-slate-800 ml-4"></div>
               </div>
 
-              {filteredTransactions.length === 0 ? (
+              {unifiedItems.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center bg-white/50 dark:bg-slate-900/50 rounded-[3rem] border border-dashed border-slate-200 dark:border-slate-800">
                   <div className="w-16 h-16 rounded-[2rem] bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-300 dark:text-slate-700 mb-4">
                     <Search size={32} />
@@ -338,49 +405,53 @@ export default function FinancialQueryModal({
                 </div>
               ) : (
                 <div className="grid grid-cols-1 gap-3">
-                  {filteredTransactions.map(tx => (
+                  {unifiedItems.map(item => (
                     <div 
-                      key={tx.id} 
+                      key={`${item.itemType}-${item.id}`} 
                       className={`p-4 rounded-[2rem] border flex items-center justify-between gap-3 hover:scale-[1.01] transition-transform ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${tx.type === TransactionType.INCOME ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400'}`}>
-                          {tx.type === TransactionType.INCOME ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${item.type === TransactionType.INCOME ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400'}`}>
+                          {item.type === TransactionType.INCOME ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                             <p className="text-[10px] font-black uppercase tracking-tight truncate leading-none text-current">{tx.description}</p>
-                             <span className={`shrink-0 text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${tx.status === 'PENDING' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/20' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/20'}`}>
-                                {tx.status === 'PENDING' ? 'Pendente' : 'Quitada'}
+                             <p className="text-[10px] font-black uppercase tracking-tight truncate leading-none text-current">{item.description}</p>
+                             <span className={`shrink-0 text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${item.status === 'PENDING' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/20' : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/20'}`}>
+                                {item.status === 'PENDING' ? 'Pendente' : 'Quitada'}
+                             </span>
+                             <span className={`shrink-0 text-[6px] font-black uppercase tracking-[0.15em] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400`}>
+                                {item.itemType}
                              </span>
                           </div>
                           <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest truncate">
-                            {tx.contactName || 'Sem contato'} • {new Date(tx.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                            {(() => {
-                              if (!tx.relatedId) return null;
-                              const purchase = purchases.find(p => p.id === tx.relatedId);
-                              if (purchase?.batchNumber) return ` • ID: ${purchase.batchNumber}`;
-                              const sale = sales.find(s => s.id === tx.relatedId);
-                              if (sale?.orderNumber) return ` • ID: ${sale.orderNumber}`;
-                              return ` • ID: ${tx.relatedId.slice(-6).toUpperCase()}`;
-                            })()}
+                            {item.contactName} • {new Date(item.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                            {item.itemType === 'TRANSACTION' && item.originalData.relatedId && ` • REF: ${item.originalData.relatedId.slice(-6).toUpperCase()}`}
                           </p>
                         </div>
                       </div>
 
                       <div className="text-right flex items-center gap-3 shrink-0 ml-auto">
                         <div className="flex flex-col items-end">
-                          <p className={`text-[11px] font-black whitespace-nowrap ${tx.type === TransactionType.INCOME ? 'text-emerald-500' : 'text-rose-500'}`}>
-                            {tx.type === TransactionType.INCOME ? '+' : '-'} R$ {tx.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          <p className={`text-[11px] font-black whitespace-nowrap ${item.type === TransactionType.INCOME ? 'text-emerald-500' : 'text-rose-500'}`}>
+                            {item.type === TransactionType.INCOME ? '+' : '-'} R$ {item.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </p>
                           <p className="text-[7px] font-black uppercase tracking-widest text-slate-400 mt-1">
-                             REF: {tx.id.slice(-6).toUpperCase()}
+                             REF: {item.id.slice(-6).toUpperCase()}
                           </p>
                         </div>
 
-                        {tx.status === 'PENDING' && (
+                        {item.status === 'PENDING' && (
                           <button 
-                            onClick={() => onSettle(tx)}
+                            onClick={() => {
+                              if (item.itemType === 'TRANSACTION') {
+                                onSettle(item.originalData);
+                              } else if (item.itemType === 'PURCHASE' && onSettlePurchase) {
+                                onSettlePurchase(item.originalData);
+                              } else if (item.itemType === 'SALE' && onSettleSale) {
+                                onSettleSale(item.originalData);
+                              }
+                            }}
                             className="w-9 h-9 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-lg shadow-indigo-500/20 active:scale-90 transition-all shrink-0"
                             title="Dar Baixa"
                           >

@@ -1,13 +1,14 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Transaction, TransactionType, Category, Account, AccountType, Person, Purchase, PaymentStatus, PurchaseType, PaymentTerm, PaymentHistory, Sale, Product } from '../types';
-import { Search, Plus, TrendingUp, TrendingDown, DollarSign, Calendar, Wallet, User, Trash2, Edit, CheckCircle2, AlertCircle, Clock, RefreshCcw, ClipboardCheck, Package, History, Clipboard, Hash } from 'lucide-react';
+import { Transaction, TransactionType, Category, Account, AccountType, Person, Purchase, PaymentStatus, PurchaseType, PaymentTerm, PaymentHistory, Sale, Product, ViewType } from '../types';
+import { Search, Plus, TrendingUp, TrendingDown, DollarSign, Calendar, Wallet, User, Trash2, Edit, CheckCircle2, AlertCircle, Clock, RefreshCcw, ClipboardCheck, Package, History, Clipboard, Hash, ShoppingBag } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import TransactionModal from '../components/TransactionModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import FinancialQueryModal from '../components/FinancialQueryModal';
 import PartialPaymentModal from '../components/PartialPaymentModal';
+import TransactionSettleModal from '../components/TransactionSettleModal';
 
 interface FinancialViewProps {
   transactions: Transaction[];
@@ -22,7 +23,9 @@ interface FinancialViewProps {
   onDelete: (id: string) => Promise<void>;
   onUpdatePurchase: (id: string, purchase: Partial<Purchase>) => Promise<void>;
   onUpdatePerson?: (id: string, updates: Partial<Person>) => Promise<void>;
+  onNavigate: (view: any, id?: string | null) => void;
   isDarkMode: boolean;
+  initialSearchQuery?: string;
 }
 
 export default function FinancialView({ 
@@ -38,14 +41,18 @@ export default function FinancialView({
   onDelete,
   onUpdatePurchase,
   onUpdatePerson,
-  isDarkMode 
+  onNavigate,
+  isDarkMode,
+  initialSearchQuery
 }: FinancialViewProps) {
-  const [filterType, setFilterType] = useState<TransactionType | 'ALL' | 'PAYABLE'>('ALL');
+  const [filterType, setFilterType] = useState<TransactionType | 'ALL' | 'PAYABLE' | 'RECEIVABLE'>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalInitialType, setModalInitialType] = useState<TransactionType>(TransactionType.INCOME);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>();
+  const [selectedTransactionForSettle, setSelectedTransactionForSettle] = useState<Transaction | null>(null);
+  const [isSettleModalOpen, setIsSettleModalOpen] = useState(false);
 
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [idToDelete, setIdToDelete] = useState<string | null>(null);
@@ -56,14 +63,39 @@ export default function FinancialView({
   const [paymentModalMode, setPaymentModalMode] = useState<'PAYMENT' | 'HISTORY'>('PAYMENT');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
-  const payableCount = useMemo(() => 
-    purchases.filter(p => p.paymentTerm === PaymentTerm.INSTALLMENTS && p.paymentStatus !== PaymentStatus.PAID).length
-  , [purchases]);
+  // Deep linking logic
+  useEffect(() => {
+    if (initialSearchQuery) {
+      if (initialSearchQuery === 'FILTER:RECEIVABLE') {
+        setFilterType('RECEIVABLE');
+      } else if (initialSearchQuery === 'FILTER:PAYABLE') {
+        setFilterType('PAYABLE');
+      } else {
+        setSearchTerm(initialSearchQuery);
+      }
+    }
+  }, [initialSearchQuery]);
+
+  const payableCount = useMemo(() => {
+    const pendingPurchases = purchases.filter(p => p.paymentTerm === PaymentTerm.INSTALLMENTS && p.paymentStatus !== PaymentStatus.PAID).length;
+    const pendingExpenses = transactions.filter(t => !t.isPersonal && t.status === 'PENDING' && t.type === TransactionType.EXPENSE).length;
+    return pendingPurchases + pendingExpenses;
+  }, [purchases, transactions]);
+
+  const receivableCount = useMemo(() => {
+    const pendingSales = sales.filter(s => s.paymentTerm === PaymentTerm.INSTALLMENTS && s.paymentStatus !== PaymentStatus.PAID).length;
+    const pendingIncomes = transactions.filter(t => !t.isPersonal && t.status === 'PENDING' && t.type === TransactionType.INCOME).length;
+    return pendingSales + pendingIncomes;
+  }, [sales, transactions]);
 
   const filtered = transactions
     .filter(t => !t.isPersonal && accounts.find(a => a.id === t.accountId)?.type !== AccountType.PERSONAL)
     .filter(t => {
-      const matchesFilter = filterType === 'ALL' || t.type === filterType;
+      const matchesFilter = 
+        filterType === 'ALL' || 
+        (filterType === 'RECEIVABLE' ? (t.type === TransactionType.INCOME && t.status === 'PENDING') :
+         filterType === 'PAYABLE' ? (t.type === TransactionType.EXPENSE && t.status === 'PENDING') :
+         t.type === filterType);
       const desc = t.description || '';
       const contact = t.contactName || '';
       const matchesSearch = desc.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -100,14 +132,44 @@ export default function FinancialView({
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleSettle = async (transaction: Transaction) => {
+    setSelectedTransactionForSettle(transaction);
+    setIsSettleModalOpen(true);
+  };
+
+  const onConfirmSettle = async (amount: number, accountId: string, note: string) => {
+    if (!selectedTransactionForSettle) return;
+
     try {
-      setSettlingId(transaction.id);
-      await onEdit(transaction.id, { status: 'COMPLETED' });
-      setSettlingId(null);
-    } catch (error: any) {
-      setSettlingId(null);
-      console.error('Error settling transaction:', error);
-      alert('Erro ao dar baixa: ' + (error.message || error));
+      if (amount >= selectedTransactionForSettle.amount) {
+        // Baixa Total
+        await onEdit(selectedTransactionForSettle.id, {
+          status: 'COMPLETED',
+          accountId,
+          description: note ? `${selectedTransactionForSettle.description} (${note})` : selectedTransactionForSettle.description,
+          date: Date.now()
+        });
+      } else {
+        // Baixa Parcial
+        // 1. Criar transação COMPLETED com o valor pago
+        const paidTx: Omit<Transaction, 'id'> = {
+          ...selectedTransactionForSettle,
+          amount,
+          accountId,
+          status: 'COMPLETED',
+          date: Date.now(),
+          description: `${selectedTransactionForSettle.description} (Parcial - ${note})`
+        };
+        await onSave(paidTx);
+
+        // 2. Atualizar a transação original PENDING subtraindo o valor
+        await onEdit(selectedTransactionForSettle.id, {
+          amount: selectedTransactionForSettle.amount - amount,
+          description: `${selectedTransactionForSettle.description} (Saldo Remanescente)`
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao dar baixa:', error);
+      alert('Erro ao processar baixa.');
     }
   };
 
@@ -157,6 +219,336 @@ export default function FinancialView({
 
     navigator.clipboard.writeText(summary);
     alert('Histórico de pagamentos copiado!');
+  };
+
+  const renderTransactionItem = (transaction: Transaction) => {
+    const category = categories.find(c => c.id === transaction.categoryId);
+    const account = accounts.find(a => a.id === transaction.accountId);
+    const isPending = transaction.status === 'PENDING';
+
+    return (
+      <div key={transaction.id} className={`p-4 rounded-2xl border shadow-sm flex flex-col gap-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${transaction.type === TransactionType.INCOME ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400'}`}>
+              {transaction.type === TransactionType.INCOME ? <TrendingUp size={24} /> : <TrendingDown size={24} />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className={`font-black text-xs uppercase tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+                  {transaction.description}
+                </h3>
+                {transaction.relatedId && sales.find(s => s.id === transaction.relatedId) && (
+                   <span className="px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 text-[7px] font-black uppercase tracking-widest">VENDA</span>
+                )}
+                {transaction.relatedId && purchases.find(p => p.id === transaction.relatedId) && (
+                   <span className="px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-500 text-[7px] font-black uppercase tracking-widest">COMPRA</span>
+                )}
+              </div>
+
+              {/* Sale Details if applicable */}
+              {(() => {
+                const sale = sales.find(s => s.id === transaction.relatedId);
+                if (sale) {
+                  return (
+                    <div className="mt-1.5 space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <User size={10} className="text-indigo-400" />
+                        <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">
+                          {sale.customerName || people.find(p => p.id === sale.customerId)?.name || 'Consumidor'}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest">
+                        <span className="flex items-center gap-1">
+                          <Clipboard size={10} />
+                          Pedido #{sale.orderNumber}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Package size={10} />
+                          {(() => {
+                            const totalItems = sale.items.reduce((acc, item) => acc + item.quantity, 0);
+                            const firstItem = sale.items[0];
+                            const firstProduct = products.find(p => p.id === firstItem?.productId);
+                            if (sale.items.length === 1 && firstProduct) {
+                              return `${firstItem.quantity}x ${firstProduct.name}`;
+                            }
+                            if (sale.items.length > 1 && firstProduct) {
+                              return `${totalItems} Itens (${firstProduct.name}...)`;
+                            }
+                            return `${totalItems} Itens`;
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const purchase = purchases.find(p => p.id === transaction.relatedId);
+                if (purchase) {
+                  const supplier = people.find(p => p.id === purchase.supplierId);
+                  return (
+                    <div className="mt-1.5 space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
+                          {supplier?.name || 'Fornecedor'}
+                        </span>
+                      </div>
+                      {purchase.notes && (
+                        <p className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[200px]">
+                          {purchase.notes}
+                        </p>
+                      )}
+                    </div>
+                  );
+                }
+
+                if (transaction.contactName) {
+                  return (
+                    <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                      <User size={10} /> {transaction.contactName}
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+            </div>
+          </div>
+          <div className="text-right">
+            <p className={`font-black text-sm tracking-tight ${transaction.type === TransactionType.INCOME ? 'text-emerald-500' : 'text-rose-500'}`}>
+              {transaction.type === TransactionType.INCOME ? '+' : '-'} R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest mt-1 ${isPending ? 'bg-amber-50 text-amber-500' : 'bg-emerald-50 text-emerald-500'}`}>
+              {isPending ? <Clock size={10} /> : <CheckCircle2 size={10} />}
+              {isPending ? 'Pendente' : 'Confirmado'}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-slate-800">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-[9px] text-indigo-400 dark:text-indigo-500 font-bold uppercase tracking-widest flex items-center gap-1">
+              <Wallet size={10} />
+              {account?.name || 'Conta'}
+            </span>
+            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1">
+              <Calendar size={10} />
+              {format(transaction.date, "dd MMM yyyy", { locale: ptBR })}
+            </span>
+          </div>
+          
+          <div className="flex gap-2">
+            {isPending && (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSettle(transaction);
+                }}
+                disabled={settlingId === transaction.id}
+                className={`flex items-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 ${
+                  settlingId === transaction.id 
+                    ? 'bg-slate-200 text-slate-500 animate-pulse' 
+                    : 'bg-emerald-500 text-white shadow-emerald-100 hover:bg-emerald-600'
+                }`}
+              >
+                {settlingId === transaction.id ? (
+                  <> <RefreshCcw size={14} className="animate-spin" /> Processando... </>
+                ) : (
+                  <> <CheckCircle2 size={16} strokeWidth={3} /> Dar Baixa </>
+                )}
+              </button>
+            )}
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleEdit(transaction);
+              }} 
+              className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-400 hover:text-indigo-500 active:bg-indigo-50 transition-all"
+              title="Editar Lançamento"
+              aria-label="Editar Lançamento"
+            >
+              <Edit size={18} strokeWidth={2.5} />
+            </button>
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteClick(transaction.id);
+              }}
+              disabled={deletingId === transaction.id}
+              className={`p-3 rounded-xl transition-all ${
+                deletingId === transaction.id
+                  ? 'bg-slate-100 text-slate-300 animate-pulse'
+                  : 'bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 active:bg-rose-50'
+              }`}
+              title="Excluir Lançamento"
+              aria-label="Excluir Lançamento"
+            >
+              {deletingId === transaction.id ? (
+                <RefreshCcw size={18} className="animate-spin" />
+              ) : (
+                <Trash2 size={18} strokeWidth={2.5} />
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPurchasePayableItem = (purchase: Purchase) => {
+    const supplier = people.find(s => s.id === purchase.supplierId);
+    const daysUntil = purchase.dueDate ? differenceInDays(purchase.dueDate, new Date()) : null;
+    const isLate = daysUntil !== null && daysUntil < 0;
+    
+    const totalPaid = (purchase.paymentHistory || []).reduce((acc, p) => acc + p.amount, 0);
+    const remaining = Math.max(0, purchase.total - totalPaid);
+
+    return (
+      <div key={purchase.id} className={`p-4 rounded-3xl border-2 border-dashed flex flex-col gap-4 ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100'}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-50 text-slate-400'}`}>
+              <Package size={24} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                 <h3 className={`font-black text-xs uppercase tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+                    {purchase.type === PurchaseType.REPLENISHMENT ? 'Abastecimento de Estoque' : 'Compra Geral'}
+                 </h3>
+                 {totalPaid > 0 && <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-500">Parcial</span>}
+                 <span className="px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-500 text-[7px] font-black uppercase tracking-widest">A PAGAR</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                <span className="flex items-center gap-1"><User size={10} /> {supplier?.name || 'Fornecedor Desconhecido'}</span>
+                <span className="flex items-center gap-1"><Hash size={10} /> ID: {purchase.batchNumber || purchase.id.slice(-6).toUpperCase()}</span>
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="font-black text-sm tracking-tight text-slate-900 dark:text-white">
+              R$ {remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            {totalPaid > 0 ? (
+               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 line-through">
+                 Total: R$ {purchase.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+               </p>
+            ) : (
+              <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest mt-1 ${isLate ? 'bg-rose-50 text-rose-500' : 'bg-amber-50 text-amber-500'}`}>
+                {isLate ? <AlertCircle size={10} /> : <Clock size={10} />}
+                {isLate ? 'Vencido' : 'Pendente'}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 pt-4 border-t border-slate-50 dark:border-slate-800">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center gap-4">
+              {purchase.dueDate && (
+                <span className={`text-[9px] font-bold uppercase tracking-widest flex items-center gap-1 ${isLate ? 'text-rose-500' : 'text-slate-400'}`}>
+                  <Calendar size={10} />
+                  Vence em: {format(purchase.dueDate, "dd/MM/yyyy")}
+                </span>
+              )}
+              {totalPaid > 0 && (
+                <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
+                   PAGO: R$ {totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              )}
+            </div>
+            
+            <button 
+               onClick={() => handlePartialPayment(purchase, 'PAYMENT')}
+               className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100 active:scale-95 transition-all translate-y-[-4px]"
+            >
+              <DollarSign size={16} strokeWidth={3} />
+              Fazer Pagamento
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={() => handlePartialPayment(purchase, 'HISTORY')}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-[9px] font-black uppercase tracking-[0.2em] transition-all hover:bg-slate-50 dark:hover:bg-slate-800 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-100 text-slate-500'}`}
+            >
+              <History size={14} />
+              Ver Histórico
+            </button>
+            <button 
+              onClick={() => copyHistory(purchase)}
+              className={`px-4 py-2.5 rounded-xl border flex items-center justify-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] transition-all ${isDarkMode ? 'bg-emerald-950/20 border-emerald-900/50 text-emerald-400 hover:bg-emerald-900/30' : 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-100'}`}
+              title="Copiar Histórico de Pagamentos"
+            >
+              <Clipboard size={14} />
+              Copiar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderSaleReceivableItem = (sale: Sale) => {
+    const customer = people.find(p => p.id === sale.customerId);
+    const daysUntil = sale.dueDate ? differenceInDays(sale.dueDate, new Date()) : null;
+    const isLate = daysUntil !== null && daysUntil < 0;
+    
+    const totalPaid = (sale.paymentHistory || []).reduce((acc, p) => acc + p.amount, 0);
+    const remaining = Math.max(0, sale.total - totalPaid);
+
+    return (
+      <div key={sale.id} className={`p-4 rounded-3xl border-2 border-dashed flex flex-col gap-4 ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100'}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-50 text-slate-400'}`}>
+              <ShoppingBag size={24} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                 <h3 className={`font-black text-xs uppercase tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+                    Venda #{sale.orderNumber}
+                 </h3>
+                 {totalPaid > 0 && <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-500">Parcial</span>}
+                 <span className="px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-500 text-[7px] font-black uppercase tracking-widest">A RECEBER</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                <span className="flex items-center gap-1"><User size={10} /> {sale.customerName || customer?.name || 'Consumidor'}</span>
+                <span className="flex items-center gap-1"><Calendar size={10} /> {format(sale.date, 'dd/MM/yyyy')}</span>
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="font-black text-sm tracking-tight text-emerald-500">
+              R$ {remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            {totalPaid > 0 && (
+               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 line-through">
+                 Total: R$ {sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+               </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 pt-4 border-t border-slate-50 dark:border-slate-800">
+           <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center gap-4">
+                {sale.dueDate && (
+                  <span className={`text-[9px] font-bold uppercase tracking-widest flex items-center gap-1 ${isLate ? 'text-rose-500' : 'text-slate-400'}`}>
+                    <Clock size={10} />
+                    Vencimento: {format(sale.dueDate, "dd/MM/yyyy")}
+                  </span>
+                )}
+              </div>
+              <button 
+                 onClick={() => onNavigate(ViewType.SALE_FORM, sale.id)}
+                 className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100 active:scale-95 transition-all"
+              >
+                <Clipboard size={16} strokeWidth={3} />
+                Gerenciar Venda
+              </button>
+           </div>
+        </div>
+      </div>
+    );
   };
 
   const onPartialPay = async (amount: number, accountId: string, note: string) => {
@@ -269,8 +661,28 @@ export default function FinancialView({
         purchases={purchases}
         sales={sales}
         onSettle={handleSettle}
+        onSettlePurchase={(p) => {
+          setSelectedPurchase(p);
+          setPaymentModalMode('PAYMENT');
+          setIsPaymentModalOpen(true);
+        }}
+        onSettleSale={(s) => onNavigate(ViewType.SALE_FORM, s.id)}
         isDarkMode={isDarkMode}
       />
+
+      {selectedTransactionForSettle && (
+        <TransactionSettleModal 
+          isOpen={isSettleModalOpen}
+          onClose={() => {
+            setIsSettleModalOpen(false);
+            setSelectedTransactionForSettle(null);
+          }}
+          transaction={selectedTransactionForSettle}
+          accounts={accounts}
+          onSettle={onConfirmSettle}
+          isDarkMode={isDarkMode}
+        />
+      )}
 
       <div className="space-y-6">
         {/* Account Warning */}
@@ -330,7 +742,7 @@ export default function FinancialView({
 
         <div className="flex flex-col gap-4 sticky top-0 z-30 py-4 bg-[#fafafa] dark:bg-slate-950 -mx-4 px-4 border-b border-slate-100 dark:border-slate-900 shadow-sm">
           {/* Filters Row */}
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1">
+          <div className="flex flex-wrap items-center gap-1.5 py-1">
             <button 
               onClick={() => setFilterType('ALL')}
               className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${filterType === 'ALL' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'}`}
@@ -360,6 +772,17 @@ export default function FinancialView({
                 </span>
               )}
             </button>
+            <button 
+              onClick={() => setFilterType('RECEIVABLE')}
+              className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2 whitespace-nowrap ${filterType === 'RECEIVABLE' ? 'bg-emerald-500 text-white' : 'bg-emerald-50 text-emerald-600'}`}
+            >
+              A Receber
+              {receivableCount > 0 && (
+                <span className={`w-5 h-5 flex items-center justify-center rounded-full text-[8px] font-black ${filterType === 'RECEIVABLE' ? 'bg-white text-emerald-600' : 'bg-emerald-500 text-white'}`}>
+                  {receivableCount}
+                </span>
+              )}
+            </button>
           </div>
 
           <div className="flex gap-2">
@@ -378,288 +801,86 @@ export default function FinancialView({
 
         <div className="flex flex-col gap-3">
           {filterType === 'PAYABLE' ? (
-            purchases
-              .filter(p => p.paymentTerm === PaymentTerm.INSTALLMENTS && p.paymentStatus !== PaymentStatus.PAID)
-              .filter(p => {
-                const supplier = people.find(s => s.id === p.supplierId);
-                const supplierName = supplier?.name || '';
-                const notes = p.notes || '';
-                return supplierName.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                       notes.toLowerCase().includes(searchTerm.toLowerCase());
-              })
-              .sort((a, b) => (a.dueDate || 0) - (b.dueDate || 0))
-              .map(purchase => {
-                const supplier = people.find(s => s.id === purchase.supplierId);
-                const daysUntil = purchase.dueDate ? differenceInDays(purchase.dueDate, new Date()) : null;
-                const isLate = daysUntil !== null && daysUntil < 0;
-                
-                const totalPaid = (purchase.paymentHistory || []).reduce((acc, p) => acc + p.amount, 0);
-                const remaining = Math.max(0, purchase.total - totalPaid);
-
-                return (
-                  <div key={purchase.id} className={`p-4 rounded-3x border-2 border-dashed flex flex-col gap-4 ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-white border-slate-100'}`}>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4 flex-1 min-w-0">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-50 text-slate-400'}`}>
-                          <Package size={24} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                             <h3 className={`font-black text-xs uppercase tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                                {purchase.type === PurchaseType.REPLENISHMENT ? 'Abastecimento de Estoque' : 'Compra Geral'}
-                             </h3>
-                             {totalPaid > 0 && <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-500">Parcial</span>}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                            <span className="flex items-center gap-1"><User size={10} /> {supplier?.name || 'Fornecedor Desconhecido'}</span>
-                            <span className="flex items-center gap-1"><Hash size={10} /> ID: {purchase.batchNumber || purchase.id.slice(-6).toUpperCase()}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-black text-sm tracking-tight text-slate-900 dark:text-white">
-                          R$ {remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
-                        {totalPaid > 0 ? (
-                           <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 line-through">
-                             Total: R$ {purchase.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                           </p>
-                        ) : (
-                          <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest mt-1 ${isLate ? 'bg-rose-50 text-rose-500' : 'bg-amber-50 text-amber-500'}`}>
-                            {isLate ? <AlertCircle size={10} /> : <Clock size={10} />}
-                            {isLate ? 'Vencido' : 'Pendente'}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-4 pt-4 border-t border-slate-50 dark:border-slate-800">
-                      <div className="flex items-center justify-between">
-                        <div className="flex flex-wrap items-center gap-4">
-                          {purchase.dueDate && (
-                            <span className={`text-[9px] font-bold uppercase tracking-widest flex items-center gap-1 ${isLate ? 'text-rose-500' : 'text-slate-400'}`}>
-                              <Calendar size={10} />
-                              Vence em: {format(purchase.dueDate, "dd/MM/yyyy")}
-                            </span>
-                          )}
-                          {totalPaid > 0 && (
-                            <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
-                               PAGO: R$ {totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </span>
-                          )}
-                        </div>
-                        
-                        <button 
-                           onClick={() => handlePartialPayment(purchase, 'PAYMENT')}
-                           className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-100 active:scale-95 transition-all translate-y-[-4px]"
-                        >
-                          <DollarSign size={16} strokeWidth={3} />
-                          Fazer Pagamento
-                        </button>
-                      </div>
-
-                      {/* New Row: History and Copy */}
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => handlePartialPayment(purchase, 'HISTORY')}
-                          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border text-[9px] font-black uppercase tracking-[0.2em] transition-all hover:bg-slate-50 dark:hover:bg-slate-800 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-white border-slate-100 text-slate-500'}`}
-                        >
-                          <History size={14} />
-                          Ver Histórico
-                        </button>
-                        <button 
-                          onClick={() => copyHistory(purchase)}
-                          className={`px-4 py-2.5 rounded-xl border flex items-center justify-center gap-2 text-[9px] font-black uppercase tracking-[0.2em] transition-all ${isDarkMode ? 'bg-emerald-950/20 border-emerald-900/50 text-emerald-400 hover:bg-emerald-900/30' : 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-100'}`}
-                          title="Copiar Histórico de Pagamentos"
-                        >
-                          <Clipboard size={14} />
-                          Copiar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-          ) : (
-            filtered.map((transaction) => {
-            const category = categories.find(c => c.id === transaction.categoryId);
-            const account = accounts.find(a => a.id === transaction.accountId);
-            const isPending = transaction.status === 'PENDING';
-
-            return (
-              <div key={transaction.id} className={`p-4 rounded-2xl border shadow-sm flex flex-col gap-4 ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${transaction.type === TransactionType.INCOME ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-900/20 dark:text-rose-400'}`}>
-                      {transaction.type === TransactionType.INCOME ? <TrendingUp size={24} /> : <TrendingDown size={24} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <h3 className={`font-black text-xs uppercase tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                          {transaction.description}
-                        </h3>
-                        {transaction.relatedId && sales.find(s => s.id === transaction.relatedId) && (
-                           <span className="px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 text-[7px] font-black uppercase tracking-widest">VENDA</span>
-                        )}
-                        {transaction.relatedId && purchases.find(p => p.id === transaction.relatedId) && (
-                           <span className="px-2 py-0.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-500 text-[7px] font-black uppercase tracking-widest">COMPRA</span>
-                        )}
-                      </div>
-
-                      {/* Sale Details if applicable */}
-                      {(() => {
-                        const sale = sales.find(s => s.id === transaction.relatedId);
-                        if (sale) {
-                          return (
-                            <div className="mt-1.5 space-y-1">
-                              <div className="flex items-center gap-1.5">
-                                <User size={10} className="text-indigo-400" />
-                                <span className="text-[9px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">
-                                  {sale.customerName || people.find(p => p.id === sale.customerId)?.name || 'Consumidor'}
-                                </span>
-                              </div>
-                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[8px] font-bold text-slate-400 uppercase tracking-widest">
-                                <span className="flex items-center gap-1">
-                                  <Clipboard size={10} />
-                                  Pedido #{sale.orderNumber}
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <Package size={10} />
-                                  {(() => {
-                                    const totalItems = sale.items.reduce((acc, item) => acc + item.quantity, 0);
-                                    const firstItem = sale.items[0];
-                                    const firstProduct = products.find(p => p.id === firstItem?.productId);
-                                    if (sale.items.length === 1 && firstProduct) {
-                                      return `${firstItem.quantity}x ${firstProduct.name}`;
-                                    }
-                                    if (sale.items.length > 1 && firstProduct) {
-                                      return `${totalItems} Itens (${firstProduct.name}...)`;
-                                    }
-                                    return `${totalItems} Itens`;
-                                  })()}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        }
-
-                        const purchase = purchases.find(p => p.id === transaction.relatedId);
-                        if (purchase) {
-                          const supplier = people.find(p => p.id === purchase.supplierId);
-                          return (
-                            <div className="mt-1.5 space-y-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
-                                  {supplier?.name || 'Fornecedor'}
-                                </span>
-                              </div>
-                              {purchase.notes && (
-                                <p className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[200px]">
-                                  {purchase.notes}
-                                </p>
-                              )}
-                            </div>
-                          );
-                        }
-
-                        if (transaction.contactName) {
-                          return (
-                            <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                              <User size={10} /> {transaction.contactName}
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`font-black text-sm tracking-tight ${transaction.type === TransactionType.INCOME ? 'text-emerald-500' : 'text-rose-500'}`}>
-                      {transaction.type === TransactionType.INCOME ? '+' : '-'} R$ {transaction.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest mt-1 ${isPending ? 'bg-amber-50 text-amber-500' : 'bg-emerald-50 text-emerald-500'}`}>
-                      {isPending ? <Clock size={10} /> : <CheckCircle2 size={10} />}
-                      {isPending ? 'Pendente' : 'Confirmado'}
-                    </div>
-                  </div>
+            <div className="space-y-4">
+              {/* Automated Purchases */}
+              {purchases
+                .filter(p => p.paymentTerm === PaymentTerm.INSTALLMENTS && p.paymentStatus !== PaymentStatus.PAID)
+                .filter(p => {
+                  const supplier = people.find(s => s.id === p.supplierId);
+                  const supplierName = supplier?.name || '';
+                  const notes = p.notes || '';
+                  return supplierName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         notes.toLowerCase().includes(searchTerm.toLowerCase());
+                })
+                .sort((a, b) => (a.dueDate || 0) - (b.dueDate || 0))
+                .map(purchase => renderPurchasePayableItem(purchase))}
+              
+              {/* Manual Pending Expenses */}
+              {transactions
+                .filter(t => !t.isPersonal && t.status === 'PENDING' && t.type === TransactionType.EXPENSE && !t.relatedId)
+                .filter(t => {
+                   const desc = t.description || '';
+                   const contact = t.contactName || '';
+                   return desc.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          contact.toLowerCase().includes(searchTerm.toLowerCase());
+                })
+                .sort((a, b) => b.date - a.date)
+                .map(t => renderTransactionItem(t))}
+              
+              {purchases.filter(p => p.paymentTerm === PaymentTerm.INSTALLMENTS && p.paymentStatus !== PaymentStatus.PAID).length === 0 &&
+               transactions.filter(t => !t.isPersonal && t.status === 'PENDING' && t.type === TransactionType.EXPENSE && !t.relatedId).length === 0 && (
+                <div className="text-center py-12">
+                   <div className="w-16 h-16 bg-slate-50 dark:bg-slate-900 rounded-3xl flex items-center justify-center mx-auto mb-4 text-slate-300">
+                      <CheckCircle2 size={32} />
+                   </div>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nenhum pagamento pendente</p>
                 </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-slate-800">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <span className="text-[9px] text-indigo-400 dark:text-indigo-500 font-bold uppercase tracking-widest flex items-center gap-1">
-                      <Wallet size={10} />
-                      {account?.name || 'Conta'}
-                    </span>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest flex items-center gap-1">
-                      <Calendar size={10} />
-                      {format(transaction.date, "dd MMM yyyy", { locale: ptBR })}
-                    </span>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    {isPending && (
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSettle(transaction);
-                        }}
-                        disabled={settlingId === transaction.id}
-                        className={`flex items-center gap-2 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl transition-all active:scale-95 ${
-                          settlingId === transaction.id 
-                            ? 'bg-slate-200 text-slate-500 animate-pulse' 
-                            : 'bg-emerald-500 text-white shadow-emerald-100 hover:bg-emerald-600'
-                        }`}
-                      >
-                        {settlingId === transaction.id ? (
-                          <> <RefreshCcw size={14} className="animate-spin" /> Processando... </>
-                        ) : (
-                          <> <CheckCircle2 size={16} strokeWidth={3} /> Dar Baixa </>
-                        )}
-                      </button>
-                    )}
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEdit(transaction);
-                      }} 
-                      className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-400 hover:text-indigo-500 active:bg-indigo-50 transition-all"
-                      title="Editar Lançamento"
-                      aria-label="Editar Lançamento"
-                    >
-                      <Edit size={18} strokeWidth={2.5} />
-                    </button>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteClick(transaction.id);
-                      }}
-                      disabled={deletingId === transaction.id}
-                      className={`p-3 rounded-xl transition-all ${
-                        deletingId === transaction.id
-                          ? 'bg-slate-100 text-slate-300 animate-pulse'
-                          : 'bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-500 active:bg-rose-50'
-                      }`}
-                      title="Excluir Lançamento"
-                      aria-label="Excluir Lançamento"
-                    >
-                      {deletingId === transaction.id ? (
-                        <RefreshCcw size={18} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={18} strokeWidth={2.5} />
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-          
-          {filtered.length === 0 && filterType !== 'PAYABLE' && (
-            <div className="text-center py-12">
-              <AlertCircle size={48} className="mx-auto text-slate-100 dark:text-slate-800 mb-4" strokeWidth={1} />
-              <p className="text-xs text-slate-300 dark:text-slate-700 font-bold uppercase tracking-widest italic">Nenhuma transação encontrada</p>
+              )}
             </div>
+          ) : filterType === 'RECEIVABLE' ? (
+            <div className="space-y-4">
+              {/* Automated Sales */}
+              {sales
+                .filter(s => s.paymentTerm === PaymentTerm.INSTALLMENTS && s.paymentStatus !== PaymentStatus.PAID)
+                .filter(s => {
+                   const customerName = s.customerName || people.find(p => p.id === s.customerId)?.name || '';
+                   return customerName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (s.orderNumber || '').toLowerCase().includes(searchTerm.toLowerCase());
+                })
+                .sort((a, b) => (a.dueDate || 0) - (b.dueDate || 0))
+                .map(sale => renderSaleReceivableItem(sale))}
+
+              {/* Manual Pending Incomes */}
+              {transactions
+                .filter(t => !t.isPersonal && t.status === 'PENDING' && t.type === TransactionType.INCOME && !t.relatedId)
+                .filter(t => {
+                   const desc = t.description || '';
+                   const contact = t.contactName || '';
+                   return desc.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          contact.toLowerCase().includes(searchTerm.toLowerCase());
+                })
+                .sort((a, b) => b.date - a.date)
+                .map(t => renderTransactionItem(t))}
+
+              {sales.filter(s => s.paymentTerm === PaymentTerm.INSTALLMENTS && s.paymentStatus !== PaymentStatus.PAID).length === 0 &&
+               transactions.filter(t => !t.isPersonal && t.status === 'PENDING' && t.type === TransactionType.INCOME && !t.relatedId).length === 0 && (
+                <div className="text-center py-12">
+                   <div className="w-16 h-16 bg-slate-50 dark:bg-slate-900 rounded-3xl flex items-center justify-center mx-auto mb-4 text-slate-300">
+                      <CheckCircle2 size={32} />
+                   </div>
+                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nenhum recebimento pendente</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            filtered.length > 0 ? (
+              filtered.map((transaction) => renderTransactionItem(transaction))
+            ) : (
+              <div className="text-center py-12">
+                <AlertCircle size={48} className="mx-auto text-slate-100 dark:text-slate-800 mb-4" strokeWidth={1} />
+                <p className="text-xs text-slate-300 dark:text-slate-700 font-bold uppercase tracking-widest italic">Nenhuma transação encontrada</p>
+              </div>
+            )
           )}
         </div>
       </div>

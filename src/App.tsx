@@ -1544,7 +1544,9 @@ export default function App() {
                 alert('Erro ao atualizar cadastro: ' + (err.message || err));
               }
             }}
+            onNavigate={navigateTo}
             isDarkMode={isDarkMode}
+            initialSearchQuery={searchContext}
           />
         );
       case ViewType.ACCOUNTS:

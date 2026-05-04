@@ -168,13 +168,29 @@ export default function DashboardView({
       }
     });
 
+    // Adicionar gastos manuais pendentes
+    transactions.forEach(t => {
+      if (t.type === TransactionType.EXPENSE && t.status === 'PENDING' && t.contactId && !t.isPersonal) {
+        if (!debtsBySupplier[t.contactId]) {
+          const person = people.find(p => p.id === t.contactId);
+          if (person) {
+            debtsBySupplier[t.contactId] = { person, totalDebt: 0, pendingCount: 0 };
+          }
+        }
+        if (debtsBySupplier[t.contactId]) {
+          debtsBySupplier[t.contactId].totalDebt += t.amount;
+          debtsBySupplier[t.contactId].pendingCount += 1;
+        }
+      }
+    });
+
     return Object.values(debtsBySupplier)
       .filter(item => item.person.name.toLowerCase().includes(supplierDebtsSearch.toLowerCase()))
       .sort((a, b) => b.totalDebt - a.totalDebt);
-  }, [purchases, people, supplierDebtsSearch]);
+  }, [purchases, transactions, people, supplierDebtsSearch]);
 
   const pendingPurchases = useMemo(() => {
-    return purchases
+    const purchaseItems = purchases
       .filter(p => {
         if (p.generateTransaction === false) return false;
         if (p.paymentStatus === PaymentStatus.PAID) return false;
@@ -188,10 +204,35 @@ export default function DashboardView({
       .map(p => ({
         ...p,
         supplierName: people.find(person => person.id === p.supplierId)?.name || "Fornecedor",
-        debt: p.total - (p.paymentHistory || []).reduce((acc, ph) => acc + ph.amount, 0)
-      }))
-      .sort((a, b) => b.date - a.date);
-  }, [purchases, people, supplierDebtsSearch]);
+        debt: p.total - (p.paymentHistory || []).reduce((acc, ph) => acc + ph.amount, 0),
+        displayType: 'PURCHASE' as const
+      }));
+
+    const manualItems = transactions
+      .filter(t => {
+        const isPendingExpense = t.type === TransactionType.EXPENSE && t.status === 'PENDING' && !t.isPersonal;
+        if (!isPendingExpense) return false;
+        const contactName = t.contactName || people.find(p => p.id === t.contactId)?.name || "";
+        const matchesSearch = contactName.toLowerCase().includes(supplierDebtsSearch.toLowerCase()) || 
+                             t.description.toLowerCase().includes(supplierDebtsSearch.toLowerCase());
+        return matchesSearch;
+      })
+      .map(t => {
+        const name = t.contactName || people.find(p => p.id === t.contactId)?.name;
+        return {
+          id: t.id,
+          date: t.date,
+          supplierId: t.contactId,
+          supplierName: name || t.description || "Fornecedor",
+          debt: t.amount,
+          total: t.amount,
+          batchNumber: name ? t.description : "Lançamento Manual",
+          displayType: 'TRANSACTION' as const
+        };
+      });
+
+    return [...purchaseItems, ...manualItems].sort((a, b) => b.date - a.date);
+  }, [purchases, transactions, people, supplierDebtsSearch]);
 
   const customersWithDebts = useMemo(() => {
     const debtsByCustomer: Record<string, { person: Person, totalDebt: number, pendingCount: number }> = {};
@@ -216,10 +257,75 @@ export default function DashboardView({
       }
     });
 
+    // Adicionar receitas manuais pendentes
+    transactions.forEach(t => {
+      if (t.type === TransactionType.INCOME && t.status === 'PENDING' && t.contactId && !t.isPersonal) {
+        if (!debtsByCustomer[t.contactId]) {
+          const person = people.find(p => p.id === t.contactId);
+          if (person) {
+            debtsByCustomer[t.contactId] = { person, totalDebt: 0, pendingCount: 0 };
+          }
+        }
+        if (debtsByCustomer[t.contactId]) {
+          debtsByCustomer[t.contactId].totalDebt += t.amount;
+          debtsByCustomer[t.contactId].pendingCount += 1;
+        }
+      }
+    });
+
     return Object.values(debtsByCustomer)
       .filter(item => item.person.name.toLowerCase().includes(customerDebtsSearch.toLowerCase()))
       .sort((a, b) => b.totalDebt - a.totalDebt);
-  }, [sales, people, customerDebtsSearch]);
+  }, [sales, transactions, people, customerDebtsSearch]);
+
+  const pendingSales = useMemo(() => {
+    const saleItems = sales
+      .filter(s => {
+        if (s.status === SaleStatus.CANCELLED) return false;
+        if (s.paymentStatus === PaymentStatus.PAID) return false;
+
+        const totalPaid = (s.paymentHistory || []).reduce((acc, ph) => acc + ph.amount, 0);
+        const debt = s.total - totalPaid;
+        const matchesSearch = (people.find(person => person.id === s.customerId)?.name || "").toLowerCase().includes(customerDebtsSearch.toLowerCase()) || 
+                             (s.orderNumber || "").toString().toLowerCase().includes(customerDebtsSearch.toLowerCase());
+        return debt > 0.01 && matchesSearch;
+      })
+      .map(s => ({
+        id: s.id,
+        date: s.date,
+        customerId: s.customerId,
+        customerName: people.find(person => person.id === s.customerId)?.name || "Cliente",
+        debt: s.total - (s.paymentHistory || []).reduce((acc, ph) => acc + ph.amount, 0),
+        total: s.total,
+        orderNumber: s.orderNumber,
+        displayType: 'SALE' as const
+      }));
+
+    const manualItems = transactions
+      .filter(t => {
+        const isPendingIncome = t.type === TransactionType.INCOME && t.status === 'PENDING' && !t.isPersonal;
+        if (!isPendingIncome) return false;
+        const contactName = t.contactName || people.find(p => p.id === t.contactId)?.name || "";
+        const matchesSearch = contactName.toLowerCase().includes(customerDebtsSearch.toLowerCase()) || 
+                             t.description.toLowerCase().includes(customerDebtsSearch.toLowerCase());
+        return matchesSearch;
+      })
+      .map(t => {
+        const name = t.contactName || people.find(p => p.id === t.contactId)?.name;
+        return {
+          id: t.id,
+          date: t.date,
+          customerId: t.contactId,
+          customerName: name || t.description || "Cliente",
+          debt: t.amount,
+          total: t.amount,
+          orderNumber: name ? t.description : "Lançamento Manual",
+          displayType: 'TRANSACTION' as const
+        };
+      });
+
+    return [...saleItems, ...manualItems].sort((a, b) => b.date - a.date);
+  }, [sales, transactions, people, customerDebtsSearch]);
 
   const stats = useMemo(() => {
     const businessAccounts = accounts.filter(a => a.type !== AccountType.PERSONAL);
@@ -276,7 +382,10 @@ export default function DashboardView({
       .reduce((acc, sale) => {
         const totalPaid = (sale.paymentHistory || []).reduce((acc, p) => acc + p.amount, 0);
         return acc + Math.max(0, sale.total - totalPaid);
-      }, 0);
+      }, 0) + 
+      transactions
+        .filter(t => t.type === TransactionType.INCOME && t.status === 'PENDING' && !t.isPersonal)
+        .reduce((acc, t) => acc + t.amount, 0);
 
     return { 
       consolidatedBalance, 
@@ -408,7 +517,7 @@ export default function DashboardView({
   }, [transactions, profitPeriodType, profitPeriodDate, profitCompPeriodType, profitCompPeriodDate, profitComparisonMode]);
 
   const filteredDebtData = useMemo(() => {
-    let list = purchases
+    const purchaseList = purchases
       .filter(p => p.generateTransaction !== false)
       .map(p => {
         const totalPaid = (p.paymentHistory || []).reduce((acc, ph) => acc + ph.amount, 0);
@@ -417,12 +526,35 @@ export default function DashboardView({
         const category = categories.find(cat => cat.id === p.categoryId);
         
         return {
-          ...p,
+          id: p.id,
+          date: p.date,
+          supplierId: p.supplierId,
           supplierName: supplier?.name || "Fornecedor",
+          categoryId: p.categoryId,
           categoryName: category?.name || "Sem Categoria",
-          debt
+          debt,
+          type: 'PURCHASE' as const
         };
       });
+
+    const manualList = transactions
+      .filter(t => t.type === TransactionType.EXPENSE && t.status === 'PENDING' && !t.isPersonal)
+      .map(t => {
+        const supplier = people.find(person => person.id === t.contactId);
+        const category = categories.find(cat => cat.id === t.categoryId);
+        return {
+          id: t.id,
+          date: t.date,
+          supplierId: t.contactId,
+          supplierName: t.contactName || supplier?.name || "Fornecedor",
+          categoryId: t.categoryId,
+          categoryName: category?.name || "Sem Categoria",
+          debt: t.amount,
+          type: 'TRANSACTION' as const
+        };
+      });
+
+    let list = [...purchaseList, ...manualList];
 
     if (debtSupplierFilter) {
       list = list.filter(p => p.supplierName.toLowerCase().includes(debtSupplierFilter.toLowerCase()));
@@ -531,7 +663,7 @@ export default function DashboardView({
             return (
               <div
                 key="receivables"
-                onClick={() => onNavigate(ViewType.FINANCIAL)}
+                onClick={() => onNavigate(ViewType.FINANCIAL, null, 'FILTER:RECEIVABLE')}
                 className={`cursor-pointer p-6 rounded-[1.5rem] border shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex justify-between items-center ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}
               >
                 <div>
@@ -603,7 +735,7 @@ export default function DashboardView({
                 <div className="flex justify-between items-center">
                   <div className={`flex border p-0.5 rounded-xl shadow-sm dark:shadow-none ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
                     <button onClick={() => setCustomerDashboardTab('DEBITS')} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${customerDashboardTab === 'DEBITS' ? 'bg-slate-500 dark:bg-slate-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
-                      DÉBITOS {customersWithDebts.length > 0 && <span className="relative flex h-4 w-4"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span><span className="relative inline-flex rounded-full h-4 w-4 bg-rose-500 text-white items-center justify-center text-[8px] font-bold">{customersWithDebts.length}</span></span>}
+                      DÉBITOS {pendingSales.length > 0 && <span className="relative flex h-4 w-4"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span><span className="relative inline-flex rounded-full h-4 w-4 bg-rose-500 text-white items-center justify-center text-[8px] font-bold">{pendingSales.length}</span></span>}
                     </button>
                     <button onClick={() => setCustomerDashboardTab('CREDITS')} className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 ${customerDashboardTab === 'CREDITS' ? 'bg-slate-500 dark:bg-slate-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}>
                       CRÉDITOS {customersWithCredits.length > 0 && <span className="relative flex h-4 w-4"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span><span className="relative inline-flex rounded-full h-4 w-4 bg-rose-500 text-white items-center justify-center text-[8px] font-bold">{customersWithCredits.length}</span></span>}
@@ -618,16 +750,32 @@ export default function DashboardView({
                 <div className="h-[200px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                   {customerDashboardTab === 'DEBITS' ? (
                     <>
-                      {customersWithDebts.map((item, idx) => (
-                        <div key={`cust-debt-${item.person.id}-${idx}`} onClick={() => onNavigate(ViewType.SALES, null, item.person.name)} className={`p-3 rounded-xl border cursor-pointer transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}>
-                          <div className="flex justify-between items-center">
-                            <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight">{item.person.name}</p>
-                            <p className="text-[11px] font-black text-rose-500">R$ {item.totalDebt.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                      {pendingSales.map((item, idx) => (
+                        <div key={`cust-debt-${item.id}-${idx}`} className={`p-3 rounded-xl border transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                          <div className="flex justify-between items-center cursor-pointer" onClick={() => item.displayType === 'SALE' ? onNavigate(ViewType.SALES, null, item.customerName) : onNavigate(ViewType.FINANCIAL, null, 'FILTER:RECEIVABLE')}>
+                            <div className="flex-1">
+                              <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight line-clamp-1">{item.customerName}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">{format(item.date, 'dd/MM/yyyy')}</p>
+                                {item.orderNumber && <p className="text-[8px] text-indigo-500 dark:text-indigo-400 font-black uppercase tracking-widest truncate max-w-[120px]">#{item.orderNumber}</p>}
+                              </div>
+                            </div>
+                            <div className="text-right ml-2">
+                              <p className="text-[11px] font-black text-rose-500">R$ {item.debt.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  item.displayType === 'SALE' ? onNavigate(ViewType.SALES, null, item.customerName) : onNavigate(ViewType.FINANCIAL, null, 'FILTER:RECEIVABLE');
+                                }}
+                                className="mt-1 px-2 py-1 bg-rose-500 hover:bg-rose-600 text-white text-[8px] font-black uppercase tracking-widest rounded-lg transition-colors shadow-sm"
+                              >
+                                Dar Baixa
+                              </button>
+                            </div>
                           </div>
-                          <p className="text-[9px] text-slate-500 mt-0.5 uppercase tracking-widest">{item.pendingCount} {item.pendingCount === 1 ? 'venda pendente' : 'vendas pendentes'}</p>
                         </div>
                       ))}
-                      {customersWithDebts.length === 0 && <p className="text-[10px] text-center text-slate-400 py-4">Nenhum cliente com débito.</p>}
+                      {pendingSales.length === 0 && <p className="text-[10px] text-center text-slate-400 py-4">Nenhum cliente com débito.</p>}
                     </>
                   ) : (
                     <>
@@ -649,7 +797,7 @@ export default function DashboardView({
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total do Período</p>
                   <p className={`text-[13px] font-black ${customerDashboardTab === 'DEBITS' ? 'text-rose-500' : 'text-emerald-500'}`}>
                     R$ {(customerDashboardTab === 'DEBITS' 
-                      ? customersWithDebts.reduce((acc, item) => acc + item.totalDebt, 0)
+                      ? pendingSales.reduce((acc, item) => acc + item.debt, 0)
                       : customersWithCredits.reduce((acc, person) => acc + (person.credit || 0), 0)
                     ).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
@@ -659,7 +807,7 @@ export default function DashboardView({
 
           case "suppliers":
             return (
-              <div key="suppliers" className={`p-6 rounded-[1.5rem] border shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col gap-4 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}>
+              <div key="suppliers" onClick={() => onNavigate(ViewType.FINANCIAL, null, 'FILTER:PAYABLE')} className={`p-6 rounded-[1.5rem] border shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col gap-4 cursor-pointer ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}>
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-none">Relacionamento Fornecedores</p>
                 <div className="flex justify-between items-center">
                   <div className={`flex border p-0.5 rounded-xl shadow-sm dark:shadow-none ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
@@ -680,14 +828,27 @@ export default function DashboardView({
                   {supplierDashboardTab === 'DEBITS' ? (
                     <>
                       {pendingPurchases.map((purchase, idx) => (
-                        <div key={`sup-pending-${purchase.id}-${idx}`} onClick={() => onNavigate(ViewType.PURCHASE_FORM, purchase.id)} className={`p-3 rounded-xl border cursor-pointer transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-slate-50 border-slate-100 hover:bg-slate-100'}`}>
-                          <div className="flex justify-between items-center">
-                            <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight">{purchase.supplierName}</p>
-                            <p className="text-[11px] font-black text-rose-500">R$ {purchase.debt.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                          </div>
-                          <div className="flex items-center justify-between mt-1">
-                            <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">{format(purchase.date, 'dd/MM/yyyy')}</p>
-                            {purchase.batchNumber && <p className="text-[8px] text-indigo-500 dark:text-indigo-400 font-black uppercase tracking-widest">#{purchase.batchNumber}</p>}
+                        <div key={`sup-pending-${purchase.id}-${idx}`} className={`p-3 rounded-xl border transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                          <div className="flex justify-between items-center cursor-pointer" onClick={() => purchase.displayType === 'PURCHASE' ? onNavigate(ViewType.PURCHASE_FORM, purchase.id) : onNavigate(ViewType.FINANCIAL, null, 'FILTER:PAYABLE')}>
+                            <div className="flex-1">
+                              <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight line-clamp-1">{purchase.supplierName}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">{format(purchase.date, 'dd/MM/yyyy')}</p>
+                                {purchase.batchNumber && <p className="text-[8px] text-indigo-500 dark:text-indigo-400 font-black uppercase tracking-widest truncate max-w-[120px]">#{purchase.batchNumber}</p>}
+                              </div>
+                            </div>
+                            <div className="text-right ml-2">
+                              <p className="text-[11px] font-black text-rose-500">R$ {purchase.debt.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  purchase.displayType === 'PURCHASE' ? onNavigate(ViewType.PURCHASE_FORM, purchase.id) : onNavigate(ViewType.FINANCIAL, null, 'FILTER:PAYABLE');
+                                }}
+                                className="mt-1 px-2 py-1 bg-rose-500 hover:bg-rose-600 text-white text-[8px] font-black uppercase tracking-widest rounded-lg transition-colors shadow-sm"
+                              >
+                                Dar Baixa
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -723,7 +884,7 @@ export default function DashboardView({
 
           case "debt_management":
             return (
-              <div key="debt_management" className={`p-6 rounded-[2rem] border shadow-[0_8px_30px_-10px_rgba(244,63,94,0.15)] flex flex-col gap-4 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}>
+              <div key="debt_management" onClick={() => onNavigate(ViewType.FINANCIAL, null, 'FILTER:PAYABLE')} className={`p-6 rounded-[2rem] border shadow-[0_8px_30px_-10px_rgba(244,63,94,0.15)] flex flex-col gap-4 cursor-pointer ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}>
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 bg-rose-50 dark:bg-rose-900/20 rounded-2xl flex items-center justify-center text-rose-500">
@@ -822,7 +983,7 @@ export default function DashboardView({
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Títulos Recentes</p>
                     <div className="space-y-2">
                       {filteredDebtData.list.slice(0, 3).map((p, i) => (
-                        <div key={`recent-debt-${i}`} onClick={() => onNavigate(ViewType.PURCHASE_FORM, p.id)} className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all hover:translate-x-1 ${isDarkMode ? 'bg-slate-950 border-slate-800 hover:border-rose-500/30' : 'bg-white border-slate-50 hover:border-rose-200'}`}><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-lg flex items-center justify-center ${p.debt > 0 ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>{p.debt > 0 ? <Clock size={14} /> : <CheckCircle2 size={14} />}</div><div><p className="text-[10px] font-black uppercase text-current leading-none">{p.supplierName}</p><p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">{format(p.date, 'dd MMM yyyy', { locale: ptBR })} • {p.categoryName}</p></div></div><p className={`text-[10px] font-black ${p.debt > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>R$ {p.debt.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p></div>
+                        <div key={`recent-debt-${i}`} onClick={() => p.type === 'PURCHASE' ? onNavigate(ViewType.PURCHASE_FORM, p.id) : onNavigate(ViewType.FINANCIAL)} className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all hover:translate-x-1 ${isDarkMode ? 'bg-slate-950 border-slate-800 hover:border-rose-500/30' : 'bg-white border-slate-50 hover:border-rose-200'}`}><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-lg flex items-center justify-center ${p.debt > 0 ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>{p.debt > 0 ? <Clock size={14} /> : <CheckCircle2 size={14} />}</div><div><p className="text-[10px] font-black uppercase text-current leading-none">{p.supplierName}</p><p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">{format(p.date, 'dd MMM yyyy', { locale: ptBR })} • {p.categoryName}</p></div></div><p className={`text-[10px] font-black ${p.debt > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>R$ {p.debt.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p></div>
                       ))}
                     </div>
                   </div>
