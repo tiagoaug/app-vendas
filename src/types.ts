@@ -103,6 +103,7 @@ export type Purchase = {
   paymentStatus?: PaymentStatus;
   paymentHistory?: PaymentHistory[];
   isAccounting?: boolean;
+  sellerName?: string;
 };
 
 export enum SaleStatus {
@@ -158,6 +159,7 @@ export type Sale = {
   paymentStatus?: PaymentStatus;
   paymentHistory?: SalePayment[];
   notes?: string;
+  sellerName?: string;
 };
 
 export type Person = {
@@ -171,6 +173,7 @@ export type Person = {
   avatar?: string;
   document?: string;
   credit?: number; // Haver/Crédito do cliente
+  sellers?: string[]; // Array of seller names associated with this person
 };
 
 export enum TransactionType {

@@ -1,6 +1,6 @@
 import { useState, useMemo, ReactNode } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Sale, Purchase, Product, CompanyCheck, Transaction, TransactionType, Account, AccountType, SaleStatus, PaymentStatus, Person, ViewType, Category, DashboardConfig } from "../types";
+import { Sale, Purchase, Product, CompanyCheck, Transaction, TransactionType, Account, AccountType, SaleStatus, PaymentStatus, Person, ViewType, Category, DashboardConfig, PaymentMethod, SalePayment } from "../types";
 import {
   TrendingUp,
   TrendingDown,
@@ -26,12 +26,15 @@ import {
   FileDown,
   Clipboard,
   Landmark,
-  User
+  User,
+  Plus
 } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import TransactionModal from "../components/TransactionModal";
+import SalePaymentModal from "../components/SalePaymentModal";
 
 interface DashboardViewProps {
   sales: Sale[];
@@ -50,6 +53,11 @@ interface DashboardViewProps {
   onNavigate: (view: ViewType, id?: string | null, search?: string) => void;
   isDarkMode: boolean;
   dashboardConfig: DashboardConfig;
+  onSaveTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<void>;
+  paymentMethods: PaymentMethod[];
+  onPaySale: (saleId: string, amount: number, accountId: string, paymentMethodId: string, note: string) => Promise<void>;
+  onUpdatePayment: (saleId: string, paymentId: string, amount: number, accountId: string, paymentMethodId: string, note: string) => Promise<void>;
+  onDeletePayment: (saleId: string, paymentId: string) => Promise<void>;
 }
 
 export default function DashboardView({
@@ -65,6 +73,11 @@ export default function DashboardView({
   onNavigate,
   isDarkMode,
   dashboardConfig,
+  onSaveTransaction,
+  paymentMethods,
+  onPaySale,
+  onUpdatePayment,
+  onDeletePayment,
 }: DashboardViewProps) {
   const [checksSearch, setChecksSearch] = useState("");
   const [lowStockSearch, setLowStockSearch] = useState("");
@@ -76,6 +89,10 @@ export default function DashboardView({
   
   const [customerDashboardTab, setCustomerDashboardTab] = useState<'DEBITS' | 'CREDITS'>('DEBITS');
   const [supplierDashboardTab, setSupplierDashboardTab] = useState<'DEBITS' | 'CREDITS'>('DEBITS');
+  const [selectedPaymentSale, setSelectedPaymentSale] = useState<string | null>(null);
+
+  const [isTransactionModalOpen, setIsTransactionModalOpen] = useState(false);
+  const [modalInitialType, setModalInitialType] = useState<TransactionType>(TransactionType.INCOME);
 
   // Filtros para o novo card de Dívidas
   const [debtSupplierFilter, setDebtSupplierFilter] = useState("");
@@ -106,6 +123,50 @@ export default function DashboardView({
       .filter(p => p.name.toLowerCase().includes(supplierDebtsSearch.toLowerCase()))
       .sort((a, b) => (b.credit || 0) - (a.credit || 0));
   }, [people, supplierDebtsSearch]);
+
+  const customersWithDebts = useMemo(() => {
+    const debtsByCustomer: Record<string, { person: Person, totalDebt: number, pendingCount: number }> = {};
+
+    sales.forEach(sale => {
+      if (sale.status === SaleStatus.CANCELLED) return;
+      if (sale.paymentStatus === PaymentStatus.PAID) return;
+
+      const totalPaid = (sale.paymentHistory || []).reduce((acc, p) => acc + p.amount, 0);
+      const debt = sale.total - totalPaid;
+      if (debt > 0.01) {
+        if (!debtsByCustomer[sale.customerId || ""]) {
+          const person = people.find(p => p.id === sale.customerId);
+          if (person) {
+            debtsByCustomer[sale.customerId!] = { person, totalDebt: 0, pendingCount: 0 };
+          }
+        }
+        if (debtsByCustomer[sale.customerId || ""]) {
+          debtsByCustomer[sale.customerId!].totalDebt += debt;
+          debtsByCustomer[sale.customerId!].pendingCount += 1;
+        }
+      }
+    });
+
+    // Adicionar receitas manuais pendentes
+    transactions.forEach(t => {
+      if (t.type === TransactionType.INCOME && t.status === 'PENDING' && t.contactId && !t.isPersonal) {
+        if (!debtsByCustomer[t.contactId]) {
+          const person = people.find(p => p.id === t.contactId);
+          if (person) {
+            debtsByCustomer[t.contactId] = { person, totalDebt: 0, pendingCount: 0 };
+          }
+        }
+        if (debtsByCustomer[t.contactId]) {
+          debtsByCustomer[t.contactId].totalDebt += t.amount;
+          debtsByCustomer[t.contactId].pendingCount += 1;
+        }
+      }
+    });
+
+    return Object.values(debtsByCustomer)
+      .filter(item => item.person.name.toLowerCase().includes(customerDebtsSearch.toLowerCase()))
+      .sort((a, b) => b.totalDebt - a.totalDebt);
+  }, [sales, transactions, people, customerDebtsSearch]);
 
 
   const statusMap: Record<string, { label: string, color: string }> = {
@@ -234,50 +295,6 @@ export default function DashboardView({
     return [...purchaseItems, ...manualItems].sort((a, b) => b.date - a.date);
   }, [purchases, transactions, people, supplierDebtsSearch]);
 
-  const customersWithDebts = useMemo(() => {
-    const debtsByCustomer: Record<string, { person: Person, totalDebt: number, pendingCount: number }> = {};
-
-    sales.forEach(sale => {
-      if (sale.status === SaleStatus.CANCELLED) return;
-      if (sale.paymentStatus === PaymentStatus.PAID) return;
-
-      const totalPaid = (sale.paymentHistory || []).reduce((acc, p) => acc + p.amount, 0);
-      const debt = sale.total - totalPaid;
-      if (debt > 0.01) {
-        if (!debtsByCustomer[sale.customerId || ""]) {
-          const person = people.find(p => p.id === sale.customerId);
-          if (person) {
-            debtsByCustomer[sale.customerId!] = { person, totalDebt: 0, pendingCount: 0 };
-          }
-        }
-        if (debtsByCustomer[sale.customerId || ""]) {
-          debtsByCustomer[sale.customerId!].totalDebt += debt;
-          debtsByCustomer[sale.customerId!].pendingCount += 1;
-        }
-      }
-    });
-
-    // Adicionar receitas manuais pendentes
-    transactions.forEach(t => {
-      if (t.type === TransactionType.INCOME && t.status === 'PENDING' && t.contactId && !t.isPersonal) {
-        if (!debtsByCustomer[t.contactId]) {
-          const person = people.find(p => p.id === t.contactId);
-          if (person) {
-            debtsByCustomer[t.contactId] = { person, totalDebt: 0, pendingCount: 0 };
-          }
-        }
-        if (debtsByCustomer[t.contactId]) {
-          debtsByCustomer[t.contactId].totalDebt += t.amount;
-          debtsByCustomer[t.contactId].pendingCount += 1;
-        }
-      }
-    });
-
-    return Object.values(debtsByCustomer)
-      .filter(item => item.person.name.toLowerCase().includes(customerDebtsSearch.toLowerCase()))
-      .sort((a, b) => b.totalDebt - a.totalDebt);
-  }, [sales, transactions, people, customerDebtsSearch]);
-
   const pendingSales = useMemo(() => {
     const saleItems = sales
       .filter(s => {
@@ -327,85 +344,11 @@ export default function DashboardView({
     return [...saleItems, ...manualItems].sort((a, b) => b.date - a.date);
   }, [sales, transactions, people, customerDebtsSearch]);
 
-  const stats = useMemo(() => {
-    const businessAccounts = accounts.filter(a => a.type !== AccountType.PERSONAL);
-    const businessTransactions = transactions.filter(t => !t.isPersonal && accounts.find(a => a.id === t.accountId)?.type !== AccountType.PERSONAL);
-
-    // Balanço unificado pelas contas comerciais
-    const consolidatedBalance = businessAccounts.reduce((acc, a) => acc + (a.balance || 0), 0);
-    
-    // Movimentação mensal pelas transações confirmadas (comerciais)
-    const now = new Date();
-    
-    const monthlyIncome = businessTransactions
-      .filter(t => t.status === 'COMPLETED' && t.type === TransactionType.INCOME)
-      .reduce((acc, t) => acc + t.amount, 0);
-      
-    const monthlyExpenses = businessTransactions
-      .filter(t => t.status === 'COMPLETED' && t.type === TransactionType.EXPENSE)
-      .reduce((acc, t) => acc + t.amount, 0);
-
-    const lowStockProducts = products.filter(p => {
-      return p.variations.some(
-        (v) =>
-          Object.values(v.stock).reduce((sum, s) => sum + s, 0) < (v.minStock || 0),
-      );
-    });
-
-    const lowStockAlerts = lowStockProducts.length;
-
-    const stockSummary = products.reduce((acc, p) => {
-      let totalQty = 0;
-      p.variations.forEach(v => {
-        const qty = Object.values(v.stock || {}).reduce((sum, s) => sum + Number(s || 0), 0);
-        totalQty += qty;
-        
-        // Group by color
-        const colorName = v.colorName || 'Sem Cor';
-        acc.stockByColor[colorName] = (acc.stockByColor[colorName] || 0) + qty;
-      });
-
-      acc.totalCostValue += totalQty * (p.costPrice || 0);
-      acc.totalSaleValue += totalQty * (p.salePrice || 0);
-      acc.estimatedProfit += totalQty * ((p.salePrice || 0) - (p.costPrice || 0));
-      
-      return acc;
-    }, { totalCostValue: 0, totalSaleValue: 0, estimatedProfit: 0, stockByColor: {} as Record<string, number> });
-
-    // Sort colors by quantity
-    const topColors = Object.entries(stockSummary.stockByColor)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5);
-
-    const pendingReceivables = sales
-      .filter(s => s.status !== SaleStatus.CANCELLED && s.paymentStatus !== PaymentStatus.PAID)
-      .reduce((acc, sale) => {
-        const totalPaid = (sale.paymentHistory || []).reduce((acc, p) => acc + p.amount, 0);
-        return acc + Math.max(0, sale.total - totalPaid);
-      }, 0) + 
-      transactions
-        .filter(t => t.type === TransactionType.INCOME && t.status === 'PENDING' && !t.isPersonal)
-        .reduce((acc, t) => acc + t.amount, 0);
-
-    return { 
-      consolidatedBalance, 
-      monthlyIncome, 
-      monthlyExpenses, 
-      lowStockAlerts, 
-      lowStockProducts,
-      totalStockCostValue: stockSummary.totalCostValue,
-      totalStockSaleValue: stockSummary.totalSaleValue,
-      estimatedStockProfit: stockSummary.estimatedProfit,
-      topColors,
-      pendingReceivables
-    };
-  }, [transactions, accounts, products, sales]);
-
   const recentActivity = useMemo(() => {
     const businessTransactions = transactions.filter(t => !t.isPersonal && accounts.find(a => a.id === t.accountId)?.type !== AccountType.PERSONAL);
     const combined = [
       ...sales
-        .filter(s => s.status !== SaleStatus.CANCELLED) // Ocultando canceladas do resumo de atividade do dashboard (opcional, ou podemos mostrar como canceladas)
+        .filter(s => s.status !== SaleStatus.CANCELLED)
         .map((s) => ({ ...s, activityType: "sale" as const })),
       ...purchases.map((p) => ({ ...p, activityType: "purchase" as const })),
       ...businessTransactions.map((t) => ({ ...t, activityType: "transaction" as const, total: t.amount, activityStatus: t.status })),
@@ -500,7 +443,7 @@ export default function DashboardView({
 
     if (profitComparisonMode === 'AUTO') {
       const duration = currentRange.end - currentRange.start;
-      previousStart = currentRange.start - duration - 1000; // Small buffer to avoid overlap
+      previousStart = currentRange.start - duration - 1000;
       previousEnd = currentRange.start - 1;
     } else {
       const compRange = getRange(profitCompPeriodType, profitCompPeriodDate);
@@ -515,6 +458,75 @@ export default function DashboardView({
 
     return { current, previous, profitDiff, previousStart, previousEnd, currentStart: currentRange.start, currentEnd: currentRange.end };
   }, [transactions, profitPeriodType, profitPeriodDate, profitCompPeriodType, profitCompPeriodDate, profitComparisonMode]);
+
+  const stats = useMemo(() => {
+    const businessAccounts = accounts.filter(a => a.type !== AccountType.PERSONAL);
+    const businessTransactions = transactions.filter(t => !t.isPersonal && accounts.find(a => a.id === t.accountId)?.type !== AccountType.PERSONAL);
+
+    const consolidatedBalance = businessAccounts.reduce((acc, a) => acc + (a.balance || 0), 0);
+    const now = new Date();
+    
+    const monthlyIncome = businessTransactions
+      .filter(t => t.status === 'COMPLETED' && t.type === TransactionType.INCOME)
+      .reduce((acc, t) => acc + t.amount, 0);
+      
+    const monthlyExpenses = businessTransactions
+      .filter(t => t.status === 'COMPLETED' && t.type === TransactionType.EXPENSE)
+      .reduce((acc, t) => acc + t.amount, 0);
+
+    const lowStockProducts = products.filter(p => {
+      return p.variations.some(
+        (v) =>
+          Object.values(v.stock).reduce((sum, s) => sum + s, 0) < (v.minStock || 0),
+      );
+    });
+
+    const lowStockAlerts = lowStockProducts.length;
+
+    const stockSummary = products.reduce((acc, p) => {
+      let totalQty = 0;
+      p.variations.forEach(v => {
+        const qty = Object.values(v.stock || {}).reduce((sum, s) => sum + Number(s || 0), 0);
+        totalQty += qty;
+        
+        const colorName = v.colorName || 'Sem Cor';
+        acc.stockByColor[colorName] = (acc.stockByColor[colorName] || 0) + qty;
+      });
+
+      acc.totalCostValue += totalQty * (p.costPrice || 0);
+      acc.totalSaleValue += totalQty * (p.salePrice || 0);
+      acc.estimatedProfit += totalQty * ((p.salePrice || 0) - (p.costPrice || 0));
+      
+      return acc;
+    }, { totalCostValue: 0, totalSaleValue: 0, estimatedProfit: 0, stockByColor: {} as Record<string, number> });
+
+    const topColors = Object.entries(stockSummary.stockByColor)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+
+    const pendingReceivables = sales
+      .filter(s => s.status !== SaleStatus.CANCELLED && s.paymentStatus !== PaymentStatus.PAID)
+      .reduce((acc, sale) => {
+        const totalPaid = (sale.paymentHistory || []).reduce((acc, p) => acc + p.amount, 0);
+        return acc + Math.max(0, sale.total - totalPaid);
+      }, 0) + 
+      transactions
+        .filter(t => t.type === TransactionType.INCOME && t.status === 'PENDING' && !t.isPersonal)
+        .reduce((acc, t) => acc + t.amount, 0);
+
+    return { 
+      consolidatedBalance, 
+      monthlyIncome, 
+      monthlyExpenses, 
+      lowStockAlerts, 
+      lowStockProducts,
+      totalStockCostValue: stockSummary.totalCostValue,
+      totalStockSaleValue: stockSummary.totalSaleValue,
+      estimatedStockProfit: stockSummary.estimatedProfit,
+      topColors,
+      pendingReceivables
+    };
+  }, [transactions, accounts, products, sales]);
 
   const filteredDebtData = useMemo(() => {
     const purchaseList = purchases
@@ -556,28 +568,12 @@ export default function DashboardView({
 
     let list = [...purchaseList, ...manualList];
 
-    if (debtSupplierFilter) {
-      list = list.filter(p => p.supplierName.toLowerCase().includes(debtSupplierFilter.toLowerCase()));
-    }
-
-    if (debtCategoryFilter) {
-      list = list.filter(p => p.categoryId === debtCategoryFilter);
-    }
-
-    if (debtStatusFilter === 'PENDING') {
-      list = list.filter(p => p.debt > 0.01);
-    } else if (debtStatusFilter === 'PAID') {
-      list = list.filter(p => p.debt <= 0.01);
-    }
-
-    if (debtStartDate) {
-      const start = new Date(debtStartDate).getTime();
-      list = list.filter(p => p.date >= start);
-    }
-    if (debtEndDate) {
-      const end = new Date(debtEndDate).getTime();
-      list = list.filter(p => p.date <= end);
-    }
+    if (debtSupplierFilter) list = list.filter(p => p.supplierName.toLowerCase().includes(debtSupplierFilter.toLowerCase()));
+    if (debtCategoryFilter) list = list.filter(p => p.categoryId === debtCategoryFilter);
+    if (debtStatusFilter === 'PENDING') list = list.filter(p => p.debt > 0.01);
+    else if (debtStatusFilter === 'PAID') list = list.filter(p => p.debt <= 0.01);
+    if (debtStartDate) list = list.filter(p => p.date >= new Date(debtStartDate).getTime());
+    if (debtEndDate) list = list.filter(p => p.date <= new Date(debtEndDate).getTime());
 
     const bySupplier: Record<string, { name: string, total: number, count: number }> = {};
     const byCategory: Record<string, { name: string, total: number, count: number }> = {};
@@ -615,71 +611,17 @@ export default function DashboardView({
     <div className="flex-1 overflow-y-auto force-scrollbar flex flex-col gap-4 pb-40 px-4 bg-[#fafafa] dark:bg-slate-950 min-h-screen pt-4">
       {sortedCards.map((card) => {
         if (!card.visible) return null;
-
         switch (card.id) {
           case "balance":
             return (
-              <div
-                key="balance"
-                onClick={() => onNavigate(ViewType.FINANCIAL)}
-                className={`cursor-pointer p-6 rounded-[1.5rem] border shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex justify-between items-center ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}
-              >
+              <div key="balance" onClick={() => onNavigate(ViewType.FINANCIAL)} className={`cursor-pointer p-6 rounded-[1.5rem] border shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex justify-between items-center ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}>
                 <div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
-                    Saldo Consolidado
-                  </p>
-                  <p className={`text-3xl font-black tracking-tight leading-none ${isDarkMode ? "text-white" : "text-slate-900"}`}>
-                    R$ {stats.consolidatedBalance.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Saldo Consolidado</p>
+                  <p className={`text-3xl font-black tracking-tight leading-none ${isDarkMode ? "text-white" : "text-slate-900"}`}>R$ {stats.consolidatedBalance.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
                 </div>
-                <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center text-indigo-500">
-                  <Wallet size={28} strokeWidth={2.5} />
-                </div>
+                <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center text-indigo-500"><Wallet size={28} strokeWidth={2.5} /></div>
               </div>
             );
-
-          case "cash_flow":
-            return (
-              <div
-                key="cash_flow"
-                onClick={() => onNavigate(ViewType.FINANCIAL)}
-                className={`cursor-pointer p-6 rounded-[1.5rem] border shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex justify-between items-center ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}
-              >
-                <div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
-                    Balanço Mensal (Liquidados)
-                  </p>
-                  <p className={`text-2xl font-black tracking-tight leading-none ${stats.monthlyIncome - stats.monthlyExpenses >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    R$ {(stats.monthlyIncome - stats.monthlyExpenses).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${stats.monthlyIncome - stats.monthlyExpenses >= 0 ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'}`}>
-                  <TrendingUp size={24} strokeWidth={2.5} />
-                </div>
-              </div>
-            );
-
-          case "receivables":
-            return (
-              <div
-                key="receivables"
-                onClick={() => onNavigate(ViewType.FINANCIAL, null, 'FILTER:RECEIVABLE')}
-                className={`cursor-pointer p-6 rounded-[1.5rem] border shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex justify-between items-center ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}
-              >
-                <div>
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
-                    A Receber (Pendente)
-                  </p>
-                  <p className={`text-2xl font-black tracking-tight leading-none ${isDarkMode ? "text-white" : "text-slate-900"}`}>
-                    R$ {stats.pendingReceivables.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center text-indigo-500">
-                  <DollarSign size={24} strokeWidth={2.5} />
-                </div>
-              </div>
-            );
-
           case "stock_alerts":
             return (
               <div key="stock_alerts" className={`p-6 rounded-[1.5rem] border shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col gap-4 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}>
@@ -728,6 +670,46 @@ export default function DashboardView({
               </div>
             );
 
+          case "manual_entry":
+            return (
+              <div key="manual_entry" className={`p-6 rounded-[2rem] border shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none flex flex-col gap-5 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className={`text-[13px] font-black uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+                      Lançamentos Manuais
+                    </h3>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest leading-none mt-1">
+                      Atalho Financeiro
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => {
+                      setModalInitialType(TransactionType.INCOME);
+                      setIsTransactionModalOpen(true);
+                    }}
+                    className="group flex flex-col items-center justify-center gap-2 py-4 rounded-2xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 active:scale-95 transition-all"
+                  >
+                    <TrendingUp size={24} strokeWidth={2.5} />
+                    <span className="text-[10px] font-black uppercase tracking-[0.15em]">Entrada</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setModalInitialType(TransactionType.EXPENSE);
+                      setIsTransactionModalOpen(true);
+                    }}
+                    className="group flex flex-col items-center justify-center gap-2 py-4 rounded-2xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 active:scale-95 transition-all"
+                  >
+                    <TrendingDown size={24} strokeWidth={2.5} />
+                    <span className="text-[10px] font-black uppercase tracking-[0.15em]">Saída</span>
+                  </button>
+                </div>
+              </div>
+            );
+
           case "customers":
             return (
               <div key="customers" className={`p-6 rounded-[1.5rem] border shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col gap-4 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}>
@@ -753,21 +735,21 @@ export default function DashboardView({
                       {pendingSales.map((item, idx) => (
                         <div key={`cust-debt-${item.id}-${idx}`} className={`p-3 rounded-xl border transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
                           <div className="flex justify-between items-center cursor-pointer" onClick={() => item.displayType === 'SALE' ? onNavigate(ViewType.SALES, null, item.customerName) : onNavigate(ViewType.FINANCIAL, null, 'FILTER:RECEIVABLE')}>
-                            <div className="flex-1">
-                              <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight line-clamp-1">{item.customerName}</p>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight truncate">{item.customerName}</p>
                               <div className="flex items-center gap-2 mt-0.5">
-                                <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">{format(item.date, 'dd/MM/yyyy')}</p>
-                                {item.orderNumber && <p className="text-[8px] text-indigo-500 dark:text-indigo-400 font-black uppercase tracking-widest truncate max-w-[120px]">#{item.orderNumber}</p>}
+                                <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold shrink-0">{format(item.date, 'dd/MM/yyyy')}</p>
+                                {item.orderNumber && <p className="text-[8px] text-indigo-500 dark:text-indigo-400 font-black uppercase tracking-widest truncate min-w-0">#{item.orderNumber}</p>}
                               </div>
                             </div>
-                            <div className="text-right ml-2">
-                              <p className="text-[11px] font-black text-rose-500">R$ {item.debt.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                            <div className="text-right ml-2 shrink-0">
+                              <p className="text-[11px] font-black text-emerald-500 whitespace-nowrap">R$ {item.debt.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  item.displayType === 'SALE' ? onNavigate(ViewType.SALES, null, item.customerName) : onNavigate(ViewType.FINANCIAL, null, 'FILTER:RECEIVABLE');
+                                  item.displayType === 'SALE' ? setSelectedPaymentSale(item.id) : onNavigate(ViewType.FINANCIAL, null, 'FILTER:RECEIVABLE');
                                 }}
-                                className="mt-1 px-2 py-1 bg-rose-500 hover:bg-rose-600 text-white text-[8px] font-black uppercase tracking-widest rounded-lg transition-colors shadow-sm"
+                                className="mt-1 px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-[8px] font-black uppercase tracking-widest rounded-lg transition-colors shadow-sm whitespace-nowrap"
                               >
                                 Dar Baixa
                               </button>
@@ -780,10 +762,10 @@ export default function DashboardView({
                   ) : (
                     <>
                       {customersWithCredits.map((person, idx) => (
-                        <div key={`cust-cred-${person.id}-${idx}`} className={`p-3 rounded-xl border transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                        <div key={`cust-cred-${person.id}-${idx}`} onClick={() => onNavigate(ViewType.FINANCIAL)} className={`p-3 rounded-xl border transition-colors cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-800/50 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
                           <div className="flex justify-between items-center">
-                            <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight">{person.name}</p>
-                            <p className="text-[11px] font-black text-emerald-500">R$ {(person.credit || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                            <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight flex-1 truncate pr-2">{person.name}</p>
+                            <p className="text-[11px] font-black text-rose-500 shrink-0 whitespace-nowrap">R$ {(person.credit || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                           </div>
                         </div>
                       ))}
@@ -795,7 +777,7 @@ export default function DashboardView({
                 {/* Footer com Somas */}
                 <div className={`mt-2 pt-3 border-t flex justify-between items-center ${isDarkMode ? 'border-slate-800' : 'border-slate-100'}`}>
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total do Período</p>
-                  <p className={`text-[13px] font-black ${customerDashboardTab === 'DEBITS' ? 'text-rose-500' : 'text-emerald-500'}`}>
+                  <p className={`text-[13px] font-black ${customerDashboardTab === 'DEBITS' ? 'text-emerald-500' : 'text-rose-500'}`}>
                     R$ {(customerDashboardTab === 'DEBITS' 
                       ? pendingSales.reduce((acc, item) => acc + item.debt, 0)
                       : customersWithCredits.reduce((acc, person) => acc + (person.credit || 0), 0)
@@ -807,7 +789,7 @@ export default function DashboardView({
 
           case "suppliers":
             return (
-              <div key="suppliers" onClick={() => onNavigate(ViewType.FINANCIAL, null, 'FILTER:PAYABLE')} className={`p-6 rounded-[1.5rem] border shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col gap-4 cursor-pointer ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}>
+              <div key="suppliers" className={`p-6 rounded-[1.5rem] border shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] flex flex-col gap-4 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}>
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-none">Relacionamento Fornecedores</p>
                 <div className="flex justify-between items-center">
                   <div className={`flex border p-0.5 rounded-xl shadow-sm dark:shadow-none ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
@@ -830,21 +812,21 @@ export default function DashboardView({
                       {pendingPurchases.map((purchase, idx) => (
                         <div key={`sup-pending-${purchase.id}-${idx}`} className={`p-3 rounded-xl border transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
                           <div className="flex justify-between items-center cursor-pointer" onClick={() => purchase.displayType === 'PURCHASE' ? onNavigate(ViewType.PURCHASE_FORM, purchase.id) : onNavigate(ViewType.FINANCIAL, null, 'FILTER:PAYABLE')}>
-                            <div className="flex-1">
-                              <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight line-clamp-1">{purchase.supplierName}</p>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight truncate">{purchase.supplierName}</p>
                               <div className="flex items-center gap-2 mt-0.5">
-                                <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">{format(purchase.date, 'dd/MM/yyyy')}</p>
-                                {purchase.batchNumber && <p className="text-[8px] text-indigo-500 dark:text-indigo-400 font-black uppercase tracking-widest truncate max-w-[120px]">#{purchase.batchNumber}</p>}
+                                <p className="text-[9px] text-slate-500 uppercase tracking-widest font-bold shrink-0">{format(purchase.date, 'dd/MM/yyyy')}</p>
+                                {purchase.batchNumber && <p className="text-[8px] text-indigo-500 dark:text-indigo-400 font-black uppercase tracking-widest truncate min-w-0">#{purchase.batchNumber}</p>}
                               </div>
                             </div>
-                            <div className="text-right ml-2">
-                              <p className="text-[11px] font-black text-rose-500">R$ {purchase.debt.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                            <div className="text-right ml-2 shrink-0">
+                              <p className="text-[11px] font-black text-rose-500 whitespace-nowrap">R$ {purchase.debt.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   purchase.displayType === 'PURCHASE' ? onNavigate(ViewType.PURCHASE_FORM, purchase.id) : onNavigate(ViewType.FINANCIAL, null, 'FILTER:PAYABLE');
                                 }}
-                                className="mt-1 px-2 py-1 bg-rose-500 hover:bg-rose-600 text-white text-[8px] font-black uppercase tracking-widest rounded-lg transition-colors shadow-sm"
+                                className="mt-1 px-2 py-1 bg-rose-500 hover:bg-rose-600 text-white text-[8px] font-black uppercase tracking-widest rounded-lg transition-colors shadow-sm whitespace-nowrap"
                               >
                                 Dar Baixa
                               </button>
@@ -857,10 +839,10 @@ export default function DashboardView({
                   ) : (
                     <>
                       {suppliersWithCredits.map((person, idx) => (
-                        <div key={`sup-cred-${person.id}-${idx}`} className={`p-3 rounded-xl border transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                        <div key={`sup-cred-${person.id}-${idx}`} onClick={() => onNavigate(ViewType.FINANCIAL)} className={`p-3 rounded-xl border transition-colors cursor-pointer hover:border-indigo-200 dark:hover:border-indigo-800/50 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
                           <div className="flex justify-between items-center">
-                            <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight">{person.name}</p>
-                            <p className="text-[11px] font-black text-emerald-500">R$ {(person.credit || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                            <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-tight flex-1 truncate pr-2">{person.name}</p>
+                            <p className="text-[11px] font-black text-emerald-500 shrink-0 whitespace-nowrap">R$ {(person.credit || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                           </div>
                         </div>
                       ))}
@@ -1229,6 +1211,39 @@ export default function DashboardView({
             return null;
         }
       })}
+      {selectedPaymentSale && (
+        <SalePaymentModal
+          isOpen={!!selectedPaymentSale}
+          onClose={() => setSelectedPaymentSale(null)}
+          sale={sales.find(s => s.id === selectedPaymentSale)!}
+          accounts={accounts}
+          paymentMethods={paymentMethods}
+          customer={people.find(p => p.id === sales.find(s => s.id === selectedPaymentSale)?.customerId)}
+          isDarkMode={isDarkMode}
+          onPay={async (amount, accountId, paymentMethodId, note) => {
+            await onPaySale(selectedPaymentSale, amount, accountId, paymentMethodId, note);
+          }}
+          onUpdatePayment={async (paymentId, amount, accountId, paymentMethodId, note) => {
+            await onUpdatePayment(selectedPaymentSale, paymentId, amount, accountId, paymentMethodId, note);
+          }}
+          onDeletePayment={async (paymentId) => {
+            await onDeletePayment(selectedPaymentSale, paymentId);
+          }}
+        />
+      )}
+
+      {isTransactionModalOpen && (
+        <TransactionModal
+          isOpen={isTransactionModalOpen}
+          onClose={() => setIsTransactionModalOpen(false)}
+          onSave={onSaveTransaction}
+          accounts={accounts}
+          categories={categories}
+          people={people}
+          isDarkMode={isDarkMode}
+          initialType={modalInitialType}
+        />
+      )}
     </div>
   );
 }

@@ -17,7 +17,6 @@ interface SalesViewProps {
   onDelete: (id: string) => void;
   onCancelOnly: (id: string) => void;
   onConvert: (id: string) => void;
-  onUpdatePaymentStatus: (id: string, status: PaymentStatus) => void;
   onPaySale: (saleId: string, amount: number, accountId: string, paymentMethodId: string, note: string) => Promise<void>;
   onUpdatePayment: (saleId: string, paymentId: string, amount: number, accountId: string, paymentMethodId: string, note: string) => Promise<void>;
   onDeletePayment: (saleId: string, paymentId: string) => Promise<void>;
@@ -37,7 +36,6 @@ export default function SalesView({
   onDelete, 
   onCancelOnly, 
   onConvert, 
-  onUpdatePaymentStatus, 
   onPaySale,
   onUpdatePayment,
   onDeletePayment,
@@ -150,6 +148,24 @@ export default function SalesView({
 
   return (
     <div className="flex flex-col gap-6 h-full pb-44 px-1 overflow-y-auto force-scrollbar">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl">
+            <ShoppingBag className="text-emerald-600 dark:text-emerald-400" size={24} strokeWidth={2.5} />
+          </div>
+          <h2 className={`text-xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+            Loja Virtual & Vendas
+          </h2>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button className={`p-2.5 rounded-xl transition-all ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-50 text-slate-400'}`}>
+            <History size={20} />
+          </button>
+        </div>
+      </div>
+
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <div>
@@ -157,42 +173,35 @@ export default function SalesView({
             <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest leading-none">Relatórios</p>
           </div>
           
-          <div className="flex flex-col items-end gap-1">
+          <div className="flex flex-col items-end gap-3">
             <div className="flex items-center gap-2">
-              <div className={`flex border p-0.5 rounded-xl shadow-sm dark:shadow-none ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                <button 
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-300 ${showFilters ? 'bg-orange-600 dark:bg-orange-600 text-white shadow-lg shadow-orange-600/40 animate-pulse' : 'text-slate-400 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-500/10 active:scale-95'}`}
-                  title="Filtrar Vendas"
-                  aria-label={showFilters ? "Fechar filtros" : "Abrir filtros"}
-                >
-                  <Filter size={16} strokeWidth={2.5} />
-                </button>
-              </div>
-              
-              <div className={`flex border p-0.5 rounded-xl shadow-sm dark:shadow-none ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-                {(['ALL', 'RETAIL', 'WHOLESALE'] as const).map(f => (
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${showFilters ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}
+              >
+                <Filter size={18} strokeWidth={2.5} />
+              </button>
+
+              <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
+                {(['RETAIL', 'WHOLESALE'] as const).map(f => (
                   <button 
                     key={f}
-                    onClick={() => setFilter(f)}
-                    className={`px-2 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all flex items-center justify-center ${filter === f ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
-                    title={f === 'ALL' ? "Todas as Vendas" : f === 'RETAIL' ? "Vendas Varejo" : "Vendas Atacado"}
-                    aria-label={f === 'ALL' ? "Mostrar todas as vendas" : f === 'RETAIL' ? "Mostrar apenas varejo" : "Mostrar apenas atacado"}
+                    onClick={() => setFilter(filter === f ? 'ALL' : f)}
+                    className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${filter === f ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
                   >
-                    {f === 'ALL' ? <Box size={14} /> : f === 'RETAIL' ? 'Varejo' : 'Atacado'}
+                    {f === 'RETAIL' ? <Box size={12} /> : <TrendingUp size={12} />}
+                    {f === 'RETAIL' ? 'Varejo' : 'Atacado'}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className={`flex border p-0.5 rounded-xl shadow-sm dark:shadow-none ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+            <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
               {(['ALL', 'PENDING', 'PAID'] as const).map(f => (
                 <button 
                   key={f}
                   onClick={() => setPaymentFilter(f)}
-                  className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all flex items-center justify-center ${paymentFilter === f ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
-                  title={f === 'ALL' ? "Todos os Pagamentos" : f === 'PENDING' ? "Pagamentos Pendentes" : "Pagamentos Concluídos"}
-                  aria-label={f === 'ALL' ? "Mostrar todos os status de pagamento" : f === 'PENDING' ? "Mostrar apenas pendentes" : "Mostrar apenas concluídos"}
+                  className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${paymentFilter === f ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
                 >
                   {f === 'ALL' ? 'Todos' : f === 'PENDING' ? 'Pendente' : 'Concluído'}
                 </button>
@@ -201,63 +210,17 @@ export default function SalesView({
           </div>
         </div>
 
-        {/* Search and Advanced Filters */}
-        <div className={`flex flex-col gap-4 overflow-hidden transition-all duration-300 ${showFilters || searchQuery ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0 mb-[-1.5rem]'}`}>
+        {/* Search */}
+        <div className={`transition-all duration-300 ${showFilters || searchQuery ? 'h-auto opacity-100' : 'h-0 opacity-0 overflow-hidden'}`}>
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} strokeWidth={2.5} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
               type="text"
-              placeholder="Pesquisar por nome do cliente ou Nº do pedido..."
+              placeholder="Buscar venda..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              title="Pesquisar Vendas"
-              aria-label="Campo de pesquisa de vendas"
-              className={`w-full h-14 pl-12 pr-4 rounded-2xl border text-[11px] font-bold uppercase tracking-widest transition-all outline-none focus:ring-2 focus:ring-indigo-600/20 ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white placeholder:text-slate-600' : 'bg-white border-slate-100 text-slate-800 placeholder:text-slate-300'}`}
+              className={`w-full h-14 pl-12 pr-4 rounded-2xl border text-xs font-bold uppercase tracking-widest outline-none transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'}`}
             />
-            {searchQuery && (
-              <button 
-                onClick={() => setSearchQuery('')}
-                title="Limpar Pesquisa"
-                aria-label="Limpar campo de pesquisa"
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-white"
-              >
-                <X size={16} strokeWidth={2.5} />
-              </button>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-            {[
-              { id: SaleStatus.SALE, label: 'Vendas', color: 'indigo' },
-              { id: SaleStatus.QUOTE, label: 'Orçamentos', color: 'amber' },
-              { id: SaleStatus.CANCELLED, label: 'Cancelados', color: 'rose' }
-            ].map(status => {
-              const isActive = selectedStatuses.includes(status.id);
-              return (
-                <button
-                  key={status.id}
-                  onClick={() => {
-                    if (isActive) {
-                      setSelectedStatuses(selectedStatuses.filter(s => s !== status.id));
-                    } else {
-                      setSelectedStatuses([...selectedStatuses, status.id]);
-                    }
-                  }}
-                  title={`Filtrar por ${status.label}`}
-                  aria-label={`${isActive ? 'Remover' : 'Incluir'} ${status.label} no filtro`}
-                  className={`flex-none px-4 py-2.5 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-2 shadow-sm ${
-                    isActive 
-                      ? status.id === SaleStatus.SALE ? 'bg-indigo-600 border-indigo-600 text-white shadow-indigo-200' :
-                        status.id === SaleStatus.QUOTE ? 'bg-amber-500 border-amber-500 text-white shadow-amber-200' :
-                        'bg-slate-900 border-slate-900 text-white shadow-slate-200'
-                      : isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-white border-slate-100 text-slate-400'
-                  } ${!isActive && 'dark:shadow-none'}`}
-                >
-                  <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-white' : status.id === SaleStatus.SALE ? 'bg-indigo-600' : status.id === SaleStatus.QUOTE ? 'bg-amber-500' : 'bg-slate-900'}`} />
-                  {status.label}
-                </button>
-              );
-            })}
           </div>
         </div>
       </div>
@@ -266,212 +229,142 @@ export default function SalesView({
         {filteredSales.map((sale) => {
           const totalPaid = (sale.paymentHistory || []).reduce((acc, p) => acc + p.amount, 0);
           const remaining = Math.max(0, sale.total - totalPaid);
-          const hasPartialPayment = totalPaid > 0 && remaining > 0;
+          const status = remaining <= 0 ? 'PAID' : 'PENDING';
+          const customer = people.find(c => c.id === sale.customerId);
 
           return (
-            <div key={sale.id} className={`p-4 rounded-3xl border shadow-sm dark:shadow-none flex flex-col gap-4 relative overflow-hidden group ${
-              sale.status === SaleStatus.CANCELLED
-                ? 'bg-slate-900 border-slate-800 opacity-60 pointer-events-none'
-                : isDarkMode
-                  ? 'bg-slate-900 border-slate-800'
-                  : 'bg-white border-slate-100'
-            }`}>
-              {/* Row 1: Customer & Status */}
-              <div className="flex justify-between items-start z-10 gap-4">
-                <div className="flex items-center gap-3 min-w-0">
-                   <div 
-                    onClick={() => setSelectedSale(sale)}
-                    className={`flex items-center justify-center cursor-pointer transition-transform hover:scale-110 shrink-0 ${sale.status === SaleStatus.QUOTE ? 'text-amber-500' : 'text-indigo-600 dark:text-indigo-400'}`}
-                   >
-                      <ShoppingBag size={28} strokeWidth={2.5} />
-                   </div>
-                   <div className="min-w-0">
-                      <h3 className={`font-extrabold text-[13px] tracking-tight leading-none uppercase truncate ${sale.status === SaleStatus.CANCELLED ? 'text-slate-500' : isDarkMode ? 'text-white' : 'text-slate-800'}`}>{sale.customerName || 'Cliente'}</h3>
-                      <div className="flex gap-1 flex-wrap mt-1.5">
-                         {sale.status === SaleStatus.CANCELLED ? (
-                           <span className="text-[7px] font-black uppercase px-2 py-0.5 rounded-lg tracking-widest bg-slate-900 text-slate-400 border border-slate-800">
-                              Cancelado
-                           </span>
-                         ) : (
-                           <>
-                             <span className={`text-[7px] font-black uppercase px-2 py-0.5 rounded-lg tracking-widest ${sale.status === 'QUOTE' ? 'bg-amber-100 text-amber-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                                {sale.status === 'QUOTE' ? 'Orçamento' : 'Venda'}
-                             </span>
-                             {sale.status === 'SALE' && (
-                               <span className={`text-[7px] font-black uppercase px-2 py-0.5 rounded-lg tracking-widest ${sale.paymentStatus === PaymentStatus.PAID ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                                  {sale.paymentStatus === PaymentStatus.PAID ? 'Quitado' : 'Pendente'}
-                               </span>
-                             )}
-                             {sale.paymentStatus === PaymentStatus.PENDING && sale.dueDate && (
-                               <span className={`text-[7px] font-black uppercase px-2 py-0.5 rounded-lg tracking-widest flex items-center gap-1 ${new Date(sale.dueDate) < new Date() ? 'bg-rose-500 text-white shadow-sm shadow-rose-200' : 'bg-indigo-50 text-indigo-600 border border-indigo-100'}`}>
-                                  <Clock size={8} />
-                                  Venc: {format(sale.dueDate, "dd/MM", { locale: ptBR })}
-                               </span>
-                             )}
-                           </>
-                         )}
+            <div key={sale.id} className={`p-5 rounded-[2rem] border transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100 shadow-sm'}`}>
+              <div className="flex justify-between items-start mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                    <ShoppingBag size={24} strokeWidth={2.5} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <h3 className={`text-[13px] font-black uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {customer?.name || sale.customerName || 'Cliente'}
+                      </h3>
+                      <div className="flex gap-1">
+                        <span className="px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[8px] font-black uppercase tracking-widest">
+                          VENDA
+                        </span>
+                        {status === 'PAID' ? (
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[8px] font-black uppercase tracking-widest">
+                            QUITADO
+                          </span>
+                        ) : (
+                          <>
+                            <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[8px] font-black uppercase tracking-widest">
+                              PENDENTE
+                            </span>
+                            {sale.dueDate && (
+                              <span className="px-2 py-0.5 rounded-md bg-red-600 text-white animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.5)] text-[8px] font-black uppercase tracking-widest">
+                                VENC: {format(sale.dueDate, "dd/MM/yy", { locale: ptBR })}
+                              </span>
+                            )}
+                          </>
+                        )}
                       </div>
-                   </div>
-                </div>
-
-                <div className="flex flex-col items-end gap-1.5 text-right shrink-0">
-                  <div className="flex items-center gap-1.5 text-[8px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-[0.2em]">
-                    <Hash size={9} strokeWidth={3} />
-                    #{sale.orderNumber}
-                  </div>
-                  <div className="flex items-center gap-1.5 text-[7px] text-slate-300 dark:text-slate-600 font-black uppercase tracking-widest">
-                    <Calendar size={10} />
-                    {format(sale.date, "dd/MM/yyyy", { locale: ptBR })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 2 (Added Line): Financial Summary & Type */}
-              <div className={`p-4 rounded-3xl flex items-center justify-between z-10 border ${isDarkMode ? 'bg-slate-800/40 border-slate-800/50' : 'bg-slate-50/50 border-slate-100/50'}`}>
-                <div className={`grid ${remaining > 0 && sale.status === SaleStatus.SALE ? 'grid-cols-3' : 'grid-cols-2'} gap-6 flex-1`}>
-                  <div className="flex flex-col">
-                    <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Total</p>
-                    <p className={`text-[12px] font-black tracking-tight ${sale.status === SaleStatus.CANCELLED ? 'text-slate-500' : 'text-indigo-600 dark:text-indigo-400'}`}>
-                      R$ {sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                  <div className="flex flex-col">
-                    <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Pago</p>
-                    <p className={`text-[12px] font-black tracking-tight ${totalPaid > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-700'}`}>
-                      R$ {totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
-                  {remaining > 0 && sale.status === SaleStatus.SALE && (
-                    <div className="flex flex-col">
-                      <p className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Falta</p>
-                      <p className="text-[12px] font-black text-rose-500 tracking-tight">
-                        R$ {remaining.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </p>
                     </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col items-end gap-1 shrink-0 ml-4">
-                  {Array.from(new Set(sale.items.map(i => i.saleType))).map((type, idx) => (
-                    <span key={idx} className={`text-[7px] font-black uppercase px-2 py-0.5 rounded-md leading-none tracking-widest ${type === SaleType.WHOLESALE ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/20' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'}`}>
-                      {type === SaleType.WHOLESALE ? 'Atacado' : 'Varejo'}
-                    </span>
-                  ))}
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
+                      #{sale.orderNumber} • {format(sale.date, "dd/MM/yyyy", { locale: ptBR })}
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              {/* Row 3: Items Preview */}
+              <div className={`p-4 rounded-3xl mb-4 flex items-center justify-between ${isDarkMode ? 'bg-slate-800/40' : 'bg-slate-50'}`}>
+                <div className="flex gap-8">
+                  <div>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Total</p>
+                    <p className={`text-sm font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                      R$ {sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Pago</p>
+                    <p className={`text-sm font-black tracking-tight ${isDarkMode ? 'text-emerald-500' : 'text-emerald-600'}`}>
+                      R$ {totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+                <div className="px-3 py-1 rounded-lg bg-orange-500 text-white text-[8px] font-black uppercase tracking-widest shadow-lg shadow-orange-500/20">
+                  {sale.items[0]?.saleType === SaleType.WHOLESALE ? 'ATACADO' : 'VAREJO'}
+                </div>
+              </div>
+
               <div 
                 onClick={() => setSelectedSale(sale)}
-                className={`p-3 rounded-2xl flex flex-col gap-2 border z-10 cursor-pointer transition-colors ${
-                  sale.status === SaleStatus.CANCELLED
-                    ? 'bg-slate-950/50 border-slate-800/50 hover:bg-slate-800/80'
-                    : 'bg-white dark:bg-slate-950/20 border-slate-100/50 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/20'
-                }`}
+                className="space-y-2 mb-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60 p-2 -mx-2 rounded-2xl transition-colors"
               >
-                {sale.items.slice(0, 2).map((item, idx) => {
+                {sale.items.slice(0, 3).map((item, idx) => {
                   const product = getProductInfo(item.productId);
                   const variation = getVariationInfo(item.productId, item.variationId);
                   return (
-                    <div key={idx} className="flex justify-between items-center">
+                    <div key={idx} className="flex items-center justify-between group/item">
                       <div className="flex items-center gap-2">
-                        <Tag size={10} className={sale.status === SaleStatus.CANCELLED ? 'text-slate-600' : 'text-slate-400'} strokeWidth={2.5} />
-                        <div>
-                          <p className={`text-[10px] font-black uppercase leading-none tracking-tight ${sale.status === SaleStatus.CANCELLED ? 'text-slate-500' : isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>{product?.reference || 'SR'} {product?.name}</p>
-                          <p className="text-[8px] text-slate-400 dark:text-slate-500 font-bold mt-1 uppercase tracking-widest">
-                            {variation?.colorName} • {item.quantity} {item.saleType === SaleType.WHOLESALE ? 'Gr' : 'Pa'}
-                          </p>
-                        </div>
+                        <Tag size={12} className="text-slate-300" />
+                        <p className={`text-[10px] font-bold uppercase tracking-tight ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {product?.name} {variation?.colorName} {item.size ? `TAM ${item.size}` : ''}
+                        </p>
                       </div>
-                      <span className={`text-[10px] font-black ${sale.status === SaleStatus.CANCELLED ? 'text-slate-600' : isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}>R$ {(item.price * item.quantity).toFixed(0)}</span>
+                      <p className={`text-[10px] font-black ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                        {item.quantity} {item.saleType === SaleType.WHOLESALE ? 'gr' : 'un'} • R$ {item.price.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                      </p>
                     </div>
                   );
                 })}
-                {sale.items.length > 2 && (
-                  <p className="text-[8px] text-slate-300 dark:text-slate-700 font-bold text-center border-t border-slate-50 dark:border-slate-800/50 pt-1.5 uppercase tracking-widest italic">+{sale.items.length - 2} outros itens</p>
+                {sale.items.length > 3 && (
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-5">
+                    + {sale.items.length - 3} itens
+                  </p>
                 )}
               </div>
 
-              <div className={`flex justify-end border-t pt-3 mt-1 ${sale.status === SaleStatus.CANCELLED ? 'border-slate-800/50' : 'border-slate-50 dark:border-slate-800/50'}`}>
-                <div className="flex items-center gap-1.5 relative">
-                <div className={`flex items-center gap-1 p-0.5 rounded-lg border shadow-sm ${
-                  sale.status === SaleStatus.CANCELLED
-                    ? 'bg-slate-800 border-slate-700'
-                    : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700'
-                }`}>
+              <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800">
+                <div className={`flex items-center gap-1.5 p-1.5 rounded-2xl ${isDarkMode ? 'bg-slate-800/80' : 'bg-slate-50 shadow-inner'}`}>
                   <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCopyMessage(sale);
-                    }}
-                    className="w-9 h-9 flex items-center justify-center text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 rounded-md transition-all active:scale-90"
-                    title="Copiar Pedido"
+                    onClick={() => handleCopyMessage(sale)}
+                    className="p-2 rounded-xl text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all active:scale-95"
                   >
-                    <Copy size={18} strokeWidth={2.5} />
+                    <Copy size={16} strokeWidth={2.5} />
                   </button>
                   <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleShareWhatsApp(sale);
-                    }}
-                    className="w-9 h-9 flex items-center justify-center text-emerald-500 hover:text-emerald-600 dark:text-emerald-400 dark:hover:text-emerald-300 rounded-md transition-all active:scale-90"
-                    title="Enviar WhatsApp"
+                    onClick={() => handleShareWhatsApp(sale)}
+                    className="p-2 rounded-xl text-emerald-500 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-all active:scale-95"
                   >
-                    <MessageSquare size={18} strokeWidth={2.5} />
+                    <MessageSquare size={16} strokeWidth={2.5} />
                   </button>
                   <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
+                    onClick={() => {
                       setPaymentModalMode('HISTORY');
                       setPaymentModalSale(sale);
                     }}
-                    className="w-9 h-9 flex items-center justify-center text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 rounded-md transition-all active:scale-90"
-                    title="Histórico de Recebimentos"
+                    className="p-2 rounded-xl text-amber-500 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-all active:scale-95"
                   >
-                    <History size={18} strokeWidth={2.5} />
+                    <History size={16} strokeWidth={2.5} />
                   </button>
-                  {sale.notes && (
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setNoteModal({ isOpen: true, note: sale.notes || "" });
-                      }}
-                      className="w-9 h-9 flex items-center justify-center text-slate-500 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-300 rounded-md transition-all active:scale-90"
-                      title="Ver Observação"
-                    >
-                      <FileText size={18} strokeWidth={2.5} />
-                    </button>
-                  )}
-                  <div className="w-[1px] h-5 bg-slate-100 dark:bg-slate-700 mx-0.5" />
                   <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onEdit(sale);
-                    }}
-                    className="w-9 h-9 flex items-center justify-center text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-white dark:hover:bg-slate-700 rounded-md transition-all active:scale-90"
-                    title="Editar Venda"
-                    aria-label="Editar detalhes da venda"
+                    onClick={() => onEdit(sale)}
+                    className="p-2 rounded-xl text-blue-500 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-all active:scale-95"
                   >
-                    <Edit2 size={18} strokeWidth={2.5} />
+                    <Edit2 size={16} strokeWidth={2.5} />
                   </button>
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      e.preventDefault();
                       setShowOptionsId(showOptionsId === sale.id ? null : sale.id);
                     }}
-                    title="Mais Opções"
-                    aria-label="Ver mais opções da venda"
-                    className={`w-9 h-9 flex items-center justify-center rounded-md transition-all active:scale-90 ${showOptionsId === sale.id ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-500 hover:text-indigo-600 hover:bg-white dark:hover:bg-slate-700'}`}
+                    className="p-2 rounded-xl text-slate-500 bg-slate-100 dark:bg-slate-700/50 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
                   >
-                    <MoreVertical size={18} strokeWidth={2.5} />
+                    <MoreVertical size={16} strokeWidth={2.5} />
                   </button>
                 </div>
 
                 {showOptionsId === sale.id && (
-                  <div className="absolute right-0 bottom-full mb-2 z-50 min-w-[180px] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <div className="absolute right-6 bottom-16 z-50 min-w-[200px] bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
                     <div className="p-3 border-b border-slate-50 dark:border-slate-700/50">
-                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Ações do Pedido</p>
+                      <p className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Opções Adicionais</p>
                     </div>
                     <div className="p-1.5 space-y-1">
                       {sale.status === SaleStatus.QUOTE && (
@@ -487,41 +380,31 @@ export default function SalesView({
                         </button>
                       )}
                       
-                      {sale.status === SaleStatus.SALE && (
-                        sale.paymentStatus === PaymentStatus.PAID ? (
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPaymentModalMode('HISTORY');
-                              setPaymentModalSale(sale);
-                              setShowOptionsId(null);
-                            }}
-                            className="w-full flex items-center gap-2.5 p-3 text-left text-[10px] font-black uppercase text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-xl transition-all"
-                          >
-                            <RotateCcw size={14} /> Reverter Valor / Ajustar
-                          </button>
-                        ) : (
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPaymentModalMode('PAYMENT');
-                              setPaymentModalSale(sale);
-                              setShowOptionsId(null);
-                            }}
-                            className="w-full flex items-center gap-2.5 p-3 text-left text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition-all"
-                          >
-                            <DollarSign size={14} /> Registrar Recebimento
-                          </button>
-                        )
-                      )}
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPaymentModalMode('PAYMENT');
+                          setPaymentModalSale(sale);
+                          setShowOptionsId(null);
+                        }}
+                        className="w-full flex items-center gap-2.5 p-3 text-left text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition-all"
+                      >
+                        <DollarSign size={14} /> Registrar Recebimento
+                      </button>
+
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // logic for cancelling or deleting if needed
+                          setShowOptionsId(null);
+                        }}
+                        className="w-full flex items-center gap-2.5 p-3 text-left text-[10px] font-black uppercase text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-all"
+                      >
+                        <Trash2 size={14} /> Cancelar Venda
+                      </button>
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
-
-            <div className={`absolute -right-4 -bottom-4 pointer-events-none transition-transform duration-500 ${sale.status === SaleStatus.CANCELLED ? 'opacity-[0.02] text-slate-500' : 'opacity-[0.03] dark:opacity-10 text-indigo-900 dark:text-indigo-400 group-hover:scale-110'}`}>
-              <TrendingUp size={80} strokeWidth={1} />
               </div>
             </div>
           );
@@ -616,7 +499,7 @@ export default function SalesView({
                           <span className={isDarkMode ? 'text-slate-200' : 'text-slate-800'}>{variation?.colorName}</span>
                           <span className="text-slate-400 mt-1">{item.quantity} {item.saleType === SaleType.WHOLESALE ? 'Grades' : 'Pares'}</span>
                         </div>
-                        <span className="text-indigo-600 dark:text-indigo-400 text-sm">R$ {(item.price * item.quantity).toFixed(0)}</span>
+                        <span className="text-indigo-600 dark:text-indigo-400 text-sm">R$ {(item.price * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                       </div>
                     </div>
                   );
@@ -627,17 +510,17 @@ export default function SalesView({
             <div className={`p-8 border-t ${isDarkMode ? 'bg-slate-800/40 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
               <div className="flex justify-between items-center mb-4">
                 <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 dark:text-slate-500">Subtotal</span>
-                <span className="text-lg font-black text-slate-600 dark:text-slate-400">R$ {selectedSale.subtotal.toFixed(0)}</span>
+                <span className="text-lg font-black text-slate-600 dark:text-slate-400">R$ {selectedSale.subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
               {selectedSale.discount > 0 && (
                 <div className="flex justify-between items-center mb-4 text-rose-500">
                   <span className="text-[10px] font-black uppercase tracking-[0.3em]">Desconto</span>
-                  <span className="text-lg font-black">- R$ {selectedSale.discount.toFixed(0)}</span>
+                  <span className="text-lg font-black">- R$ {selectedSale.discount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
               )}
               <div className="flex justify-between items-center">
                 <span className="text-[12px] font-black uppercase tracking-[0.4em] text-slate-900 dark:text-white">Total</span>
-                <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">R$ {selectedSale.total.toFixed(0)}</span>
+                <span className="text-3xl font-black text-indigo-600 dark:text-indigo-400">R$ {selectedSale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
           </div>

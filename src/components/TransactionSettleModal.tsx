@@ -40,13 +40,13 @@ export default function TransactionSettleModal({
       setAmount('');
       return;
     }
-    
+
     // Remove leading zeros if not decimal (0.5 is okay)
     let processed = val;
     if (processed.length > 1 && processed.startsWith('0') && processed[1] !== '.') {
       processed = processed.replace(/^0+/, '');
     }
-    
+
     setAmount(processed);
   };
 
@@ -80,12 +80,12 @@ export default function TransactionSettleModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      <div 
+      <div
         className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-300"
         onClick={onClose}
       />
-      
-      <motion.div 
+
+      <motion.div
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.9, opacity: 0, y: 20 }}
@@ -116,7 +116,7 @@ export default function TransactionSettleModal({
             </div>
             <div className={`flex items-center gap-3 px-4 h-14 rounded-2xl border-2 transition-all focus-within:ring-4 focus-within:ring-indigo-500/10 ${isDarkMode ? 'bg-slate-950 border-slate-800 focus-within:border-indigo-500' : 'bg-slate-50 border-slate-100 focus-within:border-indigo-500'}`}>
               <span className="text-lg font-black text-slate-400">R$</span>
-              <input 
+              <input
                 type="number"
                 step="0.01"
                 value={amount}
@@ -125,7 +125,7 @@ export default function TransactionSettleModal({
                 placeholder="0,00"
               />
               {Number(amount) !== transaction.amount && (
-                <button 
+                <button
                   onClick={() => setAmount(transaction.amount)}
                   className="text-[10px] font-black text-indigo-500 uppercase hover:underline"
                 >
@@ -133,7 +133,7 @@ export default function TransactionSettleModal({
                 </button>
               )}
             </div>
-            
+
             {remaining > 0.01 && (
               <div className="flex items-center justify-between px-1 animate-in slide-in-from-top-1 duration-300">
                 <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Saldo Remanescente:</span>
@@ -147,7 +147,7 @@ export default function TransactionSettleModal({
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Conta de Destino/Origem</label>
             <div className={`flex items-center gap-3 px-4 h-14 rounded-2xl border-2 transition-all ${isDarkMode ? 'bg-slate-950 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
               <Wallet size={18} className="text-slate-400" />
-              <select 
+              <select
                 value={accountId}
                 onChange={(e) => setAccountId(e.target.value)}
                 className="flex-1 bg-transparent text-xs font-black uppercase focus:outline-none cursor-pointer"
@@ -163,7 +163,7 @@ export default function TransactionSettleModal({
           {/* Note */}
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Observação (Opcional)</label>
-            <textarea 
+            <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Ex: Pagamento via PIX, desconto, etc..."
@@ -174,14 +174,13 @@ export default function TransactionSettleModal({
 
         {/* Footer */}
         <div className={`p-6 border-t ${isDarkMode ? 'bg-slate-900/50 border-slate-800' : 'bg-slate-50/50 border-slate-100'}`}>
-          <button 
+          <button
             onClick={handleConfirm}
             disabled={loading}
-            className={`w-full h-14 rounded-2xl flex items-center justify-center gap-3 text-sm font-black uppercase tracking-widest transition-all active:scale-95 shadow-xl ${
-              transaction.type === TransactionType.INCOME 
-                ? 'bg-emerald-500 text-white shadow-emerald-500/20 hover:bg-emerald-600' 
+            className={`w-full h-14 rounded-2xl flex items-center justify-center gap-3 text-sm font-black uppercase tracking-widest transition-all active:scale-95 shadow-xl ${transaction.type === TransactionType.INCOME
+                ? 'bg-emerald-500 text-white shadow-emerald-500/20 hover:bg-emerald-600'
                 : 'bg-rose-500 text-white shadow-rose-500/20 hover:bg-rose-600'
-            } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+              } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {loading ? (
               <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />

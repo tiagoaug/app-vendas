@@ -12,6 +12,7 @@ import {
   LogIn,
   Shield,
   Moon,
+  Sun,
   Users,
   Tags,
   TableCellsMerge,
@@ -132,15 +133,16 @@ export default function App() {
       { id: 'balance', label: 'Saldo Consolidado', visible: true, order: 0 },
       { id: 'cash_flow', label: 'Balanço Mensal', visible: true, order: 1 },
       { id: 'receivables', label: 'A Receber (Vendas)', visible: true, order: 2 },
-      { id: 'stock_alerts', label: 'Alertas de Estoque', visible: true, order: 3 },
-      { id: 'customers', label: 'Relacionamento Clientes', visible: true, order: 4 },
-      { id: 'suppliers', label: 'Relacionamento Fornecedores', visible: true, order: 5 },
-      { id: 'debt_management', label: 'Gestão de Dívidas', visible: true, order: 6 },
-      { id: 'stock_value', label: 'Patrimônio em Estoque', visible: true, order: 7 },
-      { id: 'estimated_profit', label: 'Lucro Total Estimado', visible: true, order: 8 },
-      { id: 'checks', label: 'Relatório de Cheques', visible: true, order: 9 },
-      { id: 'activity', label: 'Atividade Recente', visible: true, order: 10 },
-      { id: 'monthly_profit_detailed', label: 'Análise de Lucro Detalhada', visible: true, order: 11 },
+      { id: 'manual_entry', label: 'Lançamentos Manuais', visible: true, order: 3 },
+      { id: 'stock_alerts', label: 'Alertas de Estoque', visible: true, order: 4 },
+      { id: 'customers', label: 'Relacionamento Clientes', visible: true, order: 5 },
+      { id: 'suppliers', label: 'Relacionamento Fornecedores', visible: true, order: 6 },
+      { id: 'debt_management', label: 'Gestão de Dívidas', visible: true, order: 7 },
+      { id: 'stock_value', label: 'Patrimônio em Estoque', visible: true, order: 8 },
+      { id: 'estimated_profit', label: 'Lucro Total Estimado', visible: true, order: 9 },
+      { id: 'checks', label: 'Relatório de Cheques', visible: true, order: 10 },
+      { id: 'activity', label: 'Atividade Recente', visible: true, order: 11 },
+      { id: 'monthly_profit_detailed', label: 'Análise de Lucro Detalhada', visible: true, order: 12 },
     ]
   };
 
@@ -539,6 +541,174 @@ export default function App() {
     }
   };
 
+  const handlePaySale = async (id: string, amount: number, accountId: string, paymentMethodId: string, note: string) => {
+    const sale = sales.find(s => s.id === id);
+    if (!sale) return;
+
+    const paymentId = Math.random().toString(36).substring(2, 9);
+    const now = Date.now();
+
+    const newTransaction: Omit<Transaction, "id"> = {
+      type: TransactionType.INCOME,
+      categoryId: "rev1",
+      accountId: accountId,
+      amount: amount,
+      date: now,
+      description: `Recebimento Parcial - Venda #${sale.orderNumber}${note ? ' - ' + note : ''}`,
+      status: "COMPLETED",
+      relatedId: sale.id,
+      contactId: sale.customerId,
+      contactName: sale.customerName || people.find(p => p.id === sale.customerId)?.name,
+    };
+    
+    let txResult: any;
+    try {
+      txResult = await firebaseService.saveDocument("transactions", newTransaction);
+    } catch (err) {
+      console.error("Erro ao salvar transação:", err);
+    }
+
+    const newPayment: SalePayment = {
+      id: paymentId,
+      amount,
+      date: now,
+      accountId,
+      paymentMethodId,
+      note,
+      transactionId: txResult?.id
+    };
+
+    const newHistory = [...(sale.paymentHistory || []), newPayment];
+    const totalPaid = newHistory.reduce((acc, p) => acc + p.amount, 0);
+    const newStatus = totalPaid >= sale.total ? PaymentStatus.PAID : PaymentStatus.PENDING;
+
+    if (totalPaid > sale.total && sale.customerId) {
+      const surplus = totalPaid - sale.total;
+      const customer = people.find(p => p.id === sale.customerId);
+      if (customer) {
+        const currentCredit = customer.credit || 0;
+        await firebaseService.updateDocument("people", customer.id, {
+          credit: currentCredit + surplus
+        });
+      }
+    }
+
+    await firebaseService.updateDocument("sales", id, {
+      paymentHistory: newHistory,
+      paymentStatus: newStatus
+    });
+
+    const acc = accounts.find(a => a.id === accountId);
+    if (acc) {
+      await firebaseService.updateDocument("accounts", accountId, {
+        balance: acc.balance + amount
+      });
+    }
+  };
+
+  const handleDeletePayment = async (saleId: string, paymentId: string) => {
+    const sale = sales.find(s => s.id === saleId);
+    if (!sale || !sale.paymentHistory) return;
+
+    const payment = sale.paymentHistory.find(p => p.id === paymentId);
+    if (!payment) return;
+
+    try {
+      const amountPaidBefore = sale.paymentHistory.reduce((acc, p) => acc + p.amount, 0);
+      const surplusBefore = Math.max(0, amountPaidBefore - sale.total);
+
+      const newHistory = sale.paymentHistory.filter(p => p.id !== paymentId);
+      const amountPaidAfter = newHistory.reduce((acc, p) => acc + p.amount, 0);
+      const surplusAfter = Math.max(0, amountPaidAfter - sale.total);
+      const newStatus = amountPaidAfter >= sale.total ? PaymentStatus.PAID : PaymentStatus.PENDING;
+
+      const acc = accounts.find(a => a.id === payment.accountId);
+      if (acc) {
+        await firebaseService.updateDocument("accounts", payment.accountId, {
+          balance: acc.balance - payment.amount
+        });
+      }
+
+      if (payment.transactionId) {
+        await firebaseService.deleteDocument("transactions", payment.transactionId);
+      }
+
+      if (sale.customerId && surplusBefore > surplusAfter) {
+        const customer = people.find(p => p.id === sale.customerId);
+        if (customer) {
+          const creditToRemove = surplusBefore - surplusAfter;
+          const newCredit = Math.max(0, (customer.credit || 0) - creditToRemove);
+          await firebaseService.updateDocument("people", customer.id, {
+            credit: newCredit
+          });
+        }
+      }
+
+      await firebaseService.updateDocument("sales", saleId, {
+        paymentHistory: newHistory,
+        paymentStatus: newStatus
+      });
+    } catch (err) {
+      console.error("Erro na exclusão:", err);
+    }
+  };
+
+  const handleUpdatePayment = async (saleId: string, paymentId: string, amount: number, accountId: string, paymentMethodId: string, note: string) => {
+    const sale = sales.find(s => s.id === saleId);
+    if (!sale || !sale.paymentHistory) return;
+
+    const paymentIdx = sale.paymentHistory.findIndex(p => p.id === paymentId);
+    if (paymentIdx === -1) return;
+
+    const oldPayment = sale.paymentHistory[paymentIdx];
+    const newHistory = [...sale.paymentHistory];
+    newHistory[paymentIdx] = {
+      ...oldPayment,
+      amount,
+      accountId,
+      paymentMethodId,
+      note
+    };
+
+    const amountPaidAfter = newHistory.reduce((acc, p) => acc + p.amount, 0);
+    const newStatus = amountPaidAfter >= sale.total ? PaymentStatus.PAID : PaymentStatus.PENDING;
+
+    await firebaseService.updateDocument("sales", saleId, {
+      paymentHistory: newHistory,
+      paymentStatus: newStatus
+    });
+
+    if (oldPayment.accountId === accountId) {
+      const acc = accounts.find(a => a.id === accountId);
+      if (acc) {
+        await firebaseService.updateDocument("accounts", accountId, {
+          balance: acc.balance - oldPayment.amount + amount
+        });
+      }
+    } else {
+      const oldAcc = accounts.find(a => a.id === oldPayment.accountId);
+      if (oldAcc) {
+        await firebaseService.updateDocument("accounts", oldPayment.accountId, {
+          balance: oldAcc.balance - oldPayment.amount
+        });
+      }
+      const newAcc = accounts.find(a => a.id === accountId);
+      if (newAcc) {
+        await firebaseService.updateDocument("accounts", accountId, {
+          balance: newAcc.balance + amount
+        });
+      }
+    }
+
+    if (oldPayment.transactionId) {
+      await firebaseService.updateDocument("transactions", oldPayment.transactionId, {
+        amount,
+        accountId,
+        description: `Recebimento Parcial - Venda #${sale.orderNumber}${note ? ' - ' + note : ''}`
+      });
+    }
+  };
+
   const renderView = () => {
     switch (currentView) {
       case ViewType.DASHBOARD:
@@ -556,6 +726,19 @@ export default function App() {
             categories={categories}
             dashboardConfig={dashboardConfig || defaultDashboardConfig}
             onNavigate={navigateTo}
+            paymentMethods={paymentMethods}
+            onPaySale={handlePaySale}
+            onUpdatePayment={handleUpdatePayment}
+            onDeletePayment={handleDeletePayment}
+            onSaveTransaction={async (newTx) => {
+              try {
+                await financeService.createTransaction(newTx);
+                alert('Lançamento salvo com sucesso!');
+              } catch (err: any) {
+                console.error('Dashboard onSaveTransaction error:', err);
+                alert('Erro ao salvar lançamento: ' + (err.message || err));
+              }
+            }}
           />
         );
       case ViewType.DASHBOARD_CONFIG:
@@ -1174,316 +1357,9 @@ export default function App() {
                 alert("Pedido convertido em venda com sucesso!");
               }
             }}
-            onUpdatePaymentStatus={async (id, newStatus) => {
-              const sale = sales.find(s => s.id === id);
-              if (!sale) return;
-
-              await firebaseService.updateDocument("sales", id, {
-                paymentStatus: newStatus
-              });
-
-              if (newStatus === PaymentStatus.PAID) {
-                // Generate Financial Entry
-                const targetAccount = sale.accountId || accounts[0]?.id || "acc1";
-                const newTransaction: Omit<Transaction, "id"> = {
-                  type: TransactionType.INCOME,
-                  categoryId: "rev1",
-                  accountId: targetAccount,
-                  amount: sale.total,
-                  date: Date.now(),
-                  description: `Pagamento Venda #${sale.orderNumber}`,
-                  status: "COMPLETED",
-                  relatedId: sale.id,
-                  contactId: sale.customerId,
-                  contactName: sale.customerName || people.find(p => p.id === sale.customerId)?.name,
-                };
-                await firebaseService.saveDocument("transactions", newTransaction);
-
-                const acc = accounts.find(a => a.id === targetAccount);
-                if (acc) {
-                  await firebaseService.updateDocument("accounts", targetAccount, {
-                    balance: acc.balance + sale.total
-                  });
-                }
-                alert('Pagamento registrado e saldo atualizado!');
-              }
-            }}
-            onPaySale={async (id, amount, accountId, paymentMethodId, note) => {
-              const sale = sales.find(s => s.id === id);
-              if (!sale) return;
-
-              const paymentId = Math.random().toString(36).substring(2, 9);
-              const now = Date.now();
-
-              // 1. Create Financial Entry first to get the document ID
-              const newTransaction: Omit<Transaction, "id"> = {
-                type: TransactionType.INCOME,
-                categoryId: "rev1",
-                accountId: accountId,
-                amount: amount,
-                date: now,
-                description: `Recebimento Parcial - Venda #${sale.orderNumber}${note ? ' - ' + note : ''}`,
-                status: "COMPLETED",
-                relatedId: sale.id,
-                contactId: sale.customerId,
-                contactName: sale.customerName || people.find(p => p.id === sale.customerId)?.name,
-              };
-              
-              let txResult: any;
-              try {
-                txResult = await firebaseService.saveDocument("transactions", newTransaction);
-              } catch (err) {
-                console.error("Erro ao salvar transação:", err);
-              }
-
-              // 2. Add to payment history (with transactionId linkage)
-              const newPayment: SalePayment = {
-                id: paymentId,
-                amount,
-                date: now,
-                accountId,
-                paymentMethodId,
-                note,
-                transactionId: txResult?.id
-              };
-
-              const newHistory = [...(sale.paymentHistory || []), newPayment];
-              const totalPaid = newHistory.reduce((acc, p) => acc + p.amount, 0);
-              const newStatus = totalPaid >= sale.total ? PaymentStatus.PAID : PaymentStatus.PENDING;
-
-              // Handle surplus credit/haver
-              if (totalPaid > sale.total && sale.customerId) {
-                const surplus = totalPaid - sale.total;
-                const customer = people.find(p => p.id === sale.customerId);
-                if (customer) {
-                  const currentCredit = customer.credit || 0;
-                  await firebaseService.updateDocument("people", customer.id, {
-                    credit: currentCredit + surplus
-                  });
-                  alert(`O valor pago excedeu o total. R$ ${surplus.toLocaleString('pt-BR')} foram adicionados como crédito para o cliente.`);
-                }
-              }
-
-              // Update Sale
-              await firebaseService.updateDocument("sales", id, {
-                paymentHistory: newHistory,
-                paymentStatus: newStatus
-              });
-
-              // Update Account Balance
-              const acc = accounts.find(a => a.id === accountId);
-              if (acc) {
-                await firebaseService.updateDocument("accounts", accountId, {
-                  balance: acc.balance + amount
-                });
-              }
-
-              console.log('Recebimento registrado com sucesso!');
-            }}
-            onDeletePayment={async (saleId, paymentId) => {
-              console.log("App.tsx: onDeletePayment triggered", { saleId, paymentId });
-              
-              const sale = sales.find(s => s.id === saleId);
-              if (!sale) {
-                const msg = `Erro Crítico: Venda ID ${saleId} não encontrada.`;
-                console.error(msg);
-                alert(msg);
-                return;
-              }
-              
-              if (!sale.paymentHistory) {
-                console.error("App.tsx: Sale has no payment history", saleId);
-                return;
-              }
-
-              const payment = sale.paymentHistory.find(p => p.id === paymentId);
-              if (!payment) {
-                const msg = `Erro: Recebimento ID ${paymentId} não encontrado no histórico da venda.`;
-                console.error(msg);
-                return;
-              }
-
-              try {
-                // Calculation of surpluses for credit reversal
-                const amountPaidBefore = (sale.paymentHistory || []).reduce((acc, p) => acc + p.amount, 0);
-                const surplusBefore = Math.max(0, amountPaidBefore - sale.total);
-
-                const newHistory = sale.paymentHistory.filter(p => p.id !== paymentId);
-                const amountPaidAfter = newHistory.reduce((acc, p) => acc + p.amount, 0);
-                const surplusAfter = Math.max(0, amountPaidAfter - sale.total);
-                
-                const newStatus = amountPaidAfter >= sale.total ? PaymentStatus.PAID : PaymentStatus.PENDING;
-
-                // 1. Revert Account Balance
-                const acc = accounts.find(a => a.id === payment.accountId);
-                if (acc) {
-                  console.log("App.tsx: Reverting account balance", payment.accountId);
-                  await firebaseService.updateDocument("accounts", payment.accountId, {
-                    balance: acc.balance - payment.amount
-                  });
-                } else {
-                  console.warn("App.tsx: Account not found for balance reversal", payment.accountId);
-                }
-
-                // 2. Delete Transaction - Use link if available, fallback otherwise
-                let transactionDeleted = false;
-                if (payment.transactionId) {
-                  console.log("App.tsx: Deleting linked transaction", payment.transactionId);
-                  await firebaseService.deleteDocument("transactions", payment.transactionId);
-                  transactionDeleted = true;
-                } else {
-                  console.warn("App.tsx: No transactionId link, trying heuristic lookup (venda #" + sale.orderNumber + ")");
-                  const txToDelete = transactions.find(t => 
-                    t.relatedId === saleId && 
-                    t.amount === payment.amount && 
-                    t.accountId === payment.accountId &&
-                    Math.abs(t.date - payment.date) < 300000 // 5 min tolerance
-                  );
-
-                  if (txToDelete) {
-                    await firebaseService.deleteDocument("transactions", txToDelete.id);
-                    transactionDeleted = true;
-                  } else {
-                    // Try direct lookup
-                    const uid = auth.currentUser?.uid;
-                    if (uid) {
-                      const transactionsRef = collection(db, `users/${uid}/transactions`);
-                      const q = query(transactionsRef, 
-                        where("relatedId", "==", saleId),
-                        where("amount", "==", payment.amount),
-                        where("accountId", "==", payment.accountId)
-                      );
-                      const txSnapshot = await getDocs(q);
-                      const docs = txSnapshot.docs.filter(doc => Math.abs(doc.data().date - payment.date) < 600000); // 10 min
-                      
-                      if (docs.length > 0) {
-                        await Promise.all(docs.map(doc => firebaseService.deleteDocument("transactions", doc.id)));
-                        transactionDeleted = true;
-                      }
-                    }
-                  }
-                }
-
-                if (!transactionDeleted) {
-                   console.warn("Aviso: Não foi possível localizar o registro financeiro para exclusão automática.");
-                }
-
-                // 3. Revert Customer Credit if necessary
-                if (sale.customerId && surplusBefore > surplusAfter) {
-                  const customer = people.find(p => p.id === sale.customerId);
-                  if (customer) {
-                    const creditToRemove = surplusBefore - surplusAfter;
-                    const newCredit = Math.max(0, (customer.credit || 0) - creditToRemove);
-                    await firebaseService.updateDocument("people", customer.id, {
-                      credit: newCredit
-                    });
-                  }
-                }
-
-                // 4. Update Sale History (Central source of truth for the modal)
-                await firebaseService.updateDocument("sales", saleId, {
-                  paymentHistory: newHistory,
-                  paymentStatus: newStatus
-                });
-
-                console.log('Exclusão concluída com sucesso!');
-              } catch (err: any) {
-                console.error("Erro na exclusão:", err);
-                let errorMessage = err.message || String(err);
-                
-                // Tenta extrair a mensagem limpa se for o erro JSON do Firestore
-                try {
-                  const parsed = JSON.parse(errorMessage);
-                  if (parsed.error) errorMessage = parsed.error;
-                } catch (e) { /* Não é JSON */ }
-
-                console.error(`Erro ao processar exclusão: ${errorMessage}`);
-              }
-            }}
-            onUpdatePayment={async (saleId, paymentId, amount, accountId, paymentMethodId, note) => {
-              const sale = sales.find(s => s.id === saleId);
-              if (!sale || !sale.paymentHistory) return;
-
-              const paymentIdx = sale.paymentHistory.findIndex(p => p.id === paymentId);
-              if (paymentIdx === -1) return;
-
-              const oldPayment = sale.paymentHistory[paymentIdx];
-              const amountPaidBefore = sale.paymentHistory.reduce((acc, p) => acc + p.amount, 0);
-              const surplusBefore = Math.max(0, amountPaidBefore - sale.total);
-
-              const newHistory = [...sale.paymentHistory];
-              newHistory[paymentIdx] = {
-                ...oldPayment,
-                amount,
-                accountId,
-                paymentMethodId,
-                note
-              };
-
-              const amountPaidAfter = newHistory.reduce((acc, p) => acc + p.amount, 0);
-              const surplusAfter = Math.max(0, amountPaidAfter - sale.total);
-              const newStatus = amountPaidAfter >= sale.total ? PaymentStatus.PAID : PaymentStatus.PENDING;
-
-              // 1. Update Sale
-              await firebaseService.updateDocument("sales", saleId, {
-                paymentHistory: newHistory,
-                paymentStatus: newStatus
-              });
-
-              // 2. Adjust Account Balances
-              if (oldPayment.accountId !== accountId) {
-                const oldAcc = accounts.find(a => a.id === oldPayment.accountId);
-                if (oldAcc) await firebaseService.updateDocument("accounts", oldPayment.accountId, { balance: oldAcc.balance - oldPayment.amount });
-                
-                const newAcc = accounts.find(a => a.id === accountId);
-                const currentNewBalance = newAcc?.id === oldPayment.accountId ? (oldAcc?.balance || 0) - oldPayment.amount : (newAcc?.balance || 0);
-                if (newAcc) await firebaseService.updateDocument("accounts", accountId, { balance: currentNewBalance + amount });
-              } else {
-                const diff = amount - oldPayment.amount;
-                const acc = accounts.find(a => a.id === accountId);
-                if (acc) await firebaseService.updateDocument("accounts", accountId, { balance: acc.balance + diff });
-              }
-
-              // 3. Update Transaction - Use link if available, fallback otherwise
-              const txIdToUse = oldPayment.transactionId;
-              if (txIdToUse) {
-                await firebaseService.updateDocument("transactions", txIdToUse, {
-                  amount: amount,
-                  accountId: accountId,
-                  description: `Recebimento Parcial (Editado) - Venda #${sale.orderNumber}${note ? ' - ' + note : ''}`
-                });
-              } else {
-                const tx = transactions.find(t => 
-                  t.relatedId === saleId && 
-                  t.amount === oldPayment.amount && 
-                  t.accountId === oldPayment.accountId &&
-                  Math.abs(t.date - oldPayment.date) < 60000 // 60s tolerance consistent with delete
-                );
-                if (tx) {
-                  await firebaseService.updateDocument("transactions", tx.id, {
-                    amount: amount,
-                    accountId: accountId,
-                    description: `Recebimento Parcial (Editado) - Venda #${sale.orderNumber}${note ? ' - ' + note : ''}`
-                  });
-                } else {
-                  console.warn("Transação financeira correspondente não encontrada para atualização.");
-                }
-              }
-
-              // 4. Update Customer Credit if surplus changed
-              if (sale.customerId && surplusBefore !== surplusAfter) {
-                const customer = people.find(p => p.id === sale.customerId);
-                if (customer) {
-                  const creditDiff = surplusAfter - surplusBefore;
-                  const newCredit = Math.max(0, (customer.credit || 0) + creditDiff);
-                  await firebaseService.updateDocument("people", customer.id, {
-                    credit: newCredit
-                  });
-                }
-              }
-
-              alert('Recebimento atualizado com sucesso!');
-            }}
+            onPaySale={handlePaySale}
+            onDeletePayment={handleDeletePayment}
+            onUpdatePayment={handleUpdatePayment}
             isDarkMode={isDarkMode}
             initialSearchQuery={searchContext}
           />
@@ -1985,8 +1861,31 @@ export default function App() {
             onClick={() => setIsDarkMode(!isDarkMode)}
             title={isDarkMode ? "Mudar para modo claro" : "Mudar para modo escuro"}
             aria-label={isDarkMode ? "Mudar para modo claro" : "Mudar para modo escuro"}
+            className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-center w-10 h-10"
           >
-            <Moon size={20} />
+            <AnimatePresence mode="wait">
+              {isDarkMode ? (
+                <motion.div
+                  key="sun"
+                  initial={{ rotate: -90, scale: 0 }}
+                  animate={{ rotate: 0, scale: 1 }}
+                  exit={{ rotate: 90, scale: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Sun size={22} className="text-yellow-400 fill-yellow-400/30 animate-[spin_8s_linear_infinite]" />
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="moon"
+                  initial={{ rotate: 90, scale: 0 }}
+                  animate={{ rotate: 0, scale: 1 }}
+                  exit={{ rotate: -90, scale: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <Moon size={22} className="text-blue-500 fill-blue-500/30 animate-[pulse_3s_ease-in-out_infinite]" />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </button>
           <button 
             onClick={logout}
