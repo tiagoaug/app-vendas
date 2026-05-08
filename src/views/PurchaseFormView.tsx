@@ -1244,8 +1244,8 @@ export default function PurchaseFormView({
                         disabled={isAdded}
                         onClick={() => addBlock(p.id)}
                         className={`flex items-center justify-between p-4 rounded-3xl transition-all border text-left ${isAdded
-                            ? "bg-slate-50/50 dark:bg-slate-800/30 border-transparent opacity-50 cursor-not-allowed"
-                            : "hover:bg-slate-50 dark:hover:bg-slate-800/50 border-transparent hover:border-slate-200 dark:hover:border-slate-700 bg-transparent active:scale-[0.98]"
+                          ? "bg-slate-50/50 dark:bg-slate-800/30 border-transparent opacity-50 cursor-not-allowed"
+                          : "hover:bg-slate-50 dark:hover:bg-slate-800/50 border-transparent hover:border-slate-200 dark:hover:border-slate-700 bg-transparent active:scale-[0.98]"
                           }`}
                         aria-label={`Selecionar produto ${p.name}`}
                         title={p.name}

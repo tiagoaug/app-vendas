@@ -407,23 +407,21 @@ export default function SalesView({
   };
 
   return (
-    <div className="flex flex-col gap-6 h-full pb-44 px-1 overflow-y-auto force-scrollbar pt-4">
+    <div className="flex flex-col gap-6 h-full pb-44 px-4 overflow-y-auto force-scrollbar pt-4">
       <div className="flex flex-col gap-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
           <div>
             <h2 className={`text-[13px] font-black uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Vendas</h2>
             <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest leading-none">Relatórios</p>
           </div>
-          
-          <div className="flex flex-col items-end gap-3">
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={() => setShowFilters(!showFilters)}
-                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${showFilters ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}
-              >
-                <Filter size={18} strokeWidth={2.5} className={!showFilters ? "animate-pulse-blue" : ""} />
-              </button>
-            </div>
+
+          <button 
+            onClick={() => setShowFilters(!showFilters)}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${showFilters ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}
+          >
+            <Filter size={18} strokeWidth={2.5} className={!showFilters ? "animate-pulse-blue" : ""} />
+          </button>
+        </div>
 
             <div className={`flex flex-col gap-2 transition-all duration-300 ${showFilters ? 'h-auto opacity-100' : 'h-0 opacity-0 overflow-hidden'}`}>
               <div className="flex items-center gap-2">
@@ -489,8 +487,6 @@ export default function SalesView({
                     </button>
                   ))}
                 </div>
-              </div>
-            </div>
           </div>
         </div>
 
