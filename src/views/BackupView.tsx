@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Database, Download, Upload, AlertTriangle, RefreshCw, Copy, Trash2, CheckCircle2 } from 'lucide-react';
+import { Database, Download, Upload, AlertTriangle, RefreshCw, Copy, Trash2, CheckCircle2, LogOut } from 'lucide-react';
 import { Transaction, Purchase, Sale } from '../types';
 
 interface BackupViewProps {
@@ -11,6 +11,7 @@ interface BackupViewProps {
   onDeletePurchase: (id: string) => Promise<void>;
   onDeleteSale: (id: string) => Promise<void>;
   onResetDatabase: () => Promise<void>;
+  onLogout: () => Promise<void>;
 }
 
 export default function BackupView({ 
@@ -21,7 +22,8 @@ export default function BackupView({
   onDeleteTransaction,
   onDeletePurchase,
   onDeleteSale,
-  onResetDatabase
+  onResetDatabase,
+  onLogout
 }: BackupViewProps) {
   const [isCleaning, setIsCleaning] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
@@ -222,7 +224,20 @@ export default function BackupView({
       </div>
 
       <div className="px-6 text-center">
-        <p className="text-[9px] text-slate-300 font-bold uppercase tracking-widest">Último backup: Hoje, às 08:42</p>
+        <p className="text-[9px] text-slate-300 font-bold uppercase tracking-widest mb-6">Último backup: Hoje, às 08:42</p>
+        
+        <button 
+          onClick={onLogout}
+          className={`w-full p-6 rounded-[2rem] border shadow-sm flex items-center justify-between group active:scale-[0.98] transition-all bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800`}
+        >
+          <div className="flex items-center gap-4 text-left">
+            <LogOut size={28} className="text-slate-400 group-hover:text-rose-500 transition-colors" />
+            <div>
+              <p className={`font-bold text-sm ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>Sair do Aplicativo</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-widest mt-0.5">Encerrar sessão atual</p>
+            </div>
+          </div>
+        </button>
       </div>
 
       {showFormatConfirm && (

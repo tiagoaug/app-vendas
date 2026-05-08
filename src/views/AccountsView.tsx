@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Account, AccountType } from '../types';
-import { Plus, Wallet, Edit, Trash2, ArrowRightLeft, Search, RefreshCcw, DollarSign, Building2, Landmark, Banknote, User } from 'lucide-react';
+import { Plus, Wallet, Edit, Trash2, ArrowRightLeft, Search, RefreshCcw, DollarSign, Building2, Landmark, Banknote, User, Star } from 'lucide-react';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 interface AccountsViewProps {
@@ -10,10 +10,11 @@ interface AccountsViewProps {
   onDelete: (id: string) => void;
   onAdjust: (id: string) => void;
   onTransfer: () => void;
+  onSetDefault: (id: string) => void;
   isDarkMode: boolean;
 }
 
-export default function AccountsView({ accounts, onAdd, onEdit, onDelete, onAdjust, onTransfer, isDarkMode }: AccountsViewProps) {
+export default function AccountsView({ accounts, onAdd, onEdit, onDelete, onAdjust, onTransfer, onSetDefault, isDarkMode }: AccountsViewProps) {
   const businessAccounts = accounts.filter(a => a.type !== AccountType.PERSONAL);
   const totalBalance = businessAccounts.reduce((acc, account) => acc + account.balance, 0);
   const [filter, setFilter] = useState('TODAS');
@@ -161,6 +162,13 @@ export default function AccountsView({ accounts, onAdd, onEdit, onDelete, onAdju
                 </div>
 
                 <div className="flex items-center gap-1">
+                   <button 
+                     onClick={() => onSetDefault(account.id)}
+                     className={`p-2 rounded-xl transition-all ${account.isDefault ? 'text-amber-500' : isDarkMode ? 'text-slate-700 hover:text-amber-400' : 'text-slate-200 hover:text-amber-500'}`}
+                     title={account.isDefault ? "Conta Padrão" : "Definir como Padrão"}
+                   >
+                     <Star size={18} strokeWidth={2.5} fill={account.isDefault ? "currentColor" : "none"} />
+                   </button>
                    <button 
                      onClick={() => onAdjust(account.id)}
                      className={`p-2 rounded-xl transition-all ${isDarkMode ? 'text-slate-700 hover:text-emerald-400' : 'text-slate-200 hover:text-emerald-600'}`}

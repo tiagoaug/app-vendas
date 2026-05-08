@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Person } from '../types';
-import { X } from 'lucide-react';
+import { X, Plus, Trash2 } from 'lucide-react';
 
 interface PersonModalProps {
   isOpen: boolean;
@@ -16,6 +16,8 @@ export default function PersonModal({ isOpen, onClose, onSave, person }: PersonM
   const [document, setDocument] = useState('');
   const [isCustomer, setIsCustomer] = useState(false);
   const [isSupplier, setIsSupplier] = useState(false);
+  const [sellers, setSellers] = useState<string[]>([]);
+  const [newSellerName, setNewSellerName] = useState('');
 
   useEffect(() => {
     if (person) {
@@ -25,6 +27,7 @@ export default function PersonModal({ isOpen, onClose, onSave, person }: PersonM
       setDocument(person.document || '');
       setIsCustomer(person.isCustomer || false);
       setIsSupplier(person.isSupplier || false);
+      setSellers(person.sellers || []);
     } else {
       setName('');
       setPhone('');
@@ -32,17 +35,19 @@ export default function PersonModal({ isOpen, onClose, onSave, person }: PersonM
       setDocument('');
       setIsCustomer(false);
       setIsSupplier(false);
+      setSellers([]);
+      setNewSellerName('');
     }
   }, [person, isOpen]);
 
   if (!isOpen) return null;
 
   const handleSave = () => {
-    if (!name || !phone) {
-      alert('Nome e Telefone são obrigatórios');
+    if (!name) {
+      alert('Nome é obrigatório');
       return;
     }
-    onSave({ name, phone, email, document, isCustomer, isSupplier });
+    onSave({ name, phone, email, document, isCustomer, isSupplier, sellers });
     
     // Se for um novo cadastro, limpa para o próximo
     if (!person) {
@@ -52,10 +57,25 @@ export default function PersonModal({ isOpen, onClose, onSave, person }: PersonM
       setDocument('');
       setIsCustomer(false);
       setIsSupplier(false);
+      setSellers([]);
+      setNewSellerName('');
       alert('Cadastro realizado com sucesso!');
     } else {
       onClose();
     }
+  };
+
+  const handleAddSeller = () => {
+    if (newSellerName.trim()) {
+      if (!sellers.includes(newSellerName.trim())) {
+        setSellers([...sellers, newSellerName.trim()]);
+      }
+      setNewSellerName('');
+    }
+  };
+
+  const handleRemoveSeller = (seller: string) => {
+    setSellers(sellers.filter(s => s !== seller));
   };
 
   return (
@@ -140,6 +160,51 @@ export default function PersonModal({ isOpen, onClose, onSave, person }: PersonM
               <span className="text-[11px] font-black uppercase tracking-widest text-slate-600 dark:text-slate-300">Fornecedor</span>
             </label>
           </div>
+
+          <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Vendedores Associados</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Nome do vendedor"
+                className="flex-1 h-12 bg-slate-50 dark:bg-slate-800/50 border-2 border-transparent focus:border-indigo-500 rounded-2xl px-5 text-sm font-bold transition-all outline-none dark:text-white"
+                value={newSellerName}
+                onChange={(e) => setNewSellerName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddSeller();
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={handleAddSeller}
+                className="h-12 px-4 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 rounded-2xl hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors flex items-center justify-center"
+                title="Adicionar vendedor"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
+            
+            {sellers.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-2">
+                {sellers.map((seller) => (
+                  <div key={seller} className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{seller}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSeller(seller)}
+                      className="text-rose-500 hover:text-rose-600 p-0.5 rounded-md hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
 
           <div className="flex gap-3 mt-8">
             <button 

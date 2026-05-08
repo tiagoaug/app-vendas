@@ -131,18 +131,19 @@ export default function App() {
   const defaultDashboardConfig: DashboardConfig = {
     cards: [
       { id: 'balance', label: 'Saldo Consolidado', visible: true, order: 0 },
-      { id: 'cash_flow', label: 'Balanço Mensal', visible: true, order: 1 },
-      { id: 'receivables', label: 'A Receber (Vendas)', visible: true, order: 2 },
-      { id: 'manual_entry', label: 'Lançamentos Manuais', visible: true, order: 3 },
-      { id: 'stock_alerts', label: 'Alertas de Estoque', visible: true, order: 4 },
-      { id: 'customers', label: 'Relacionamento Clientes', visible: true, order: 5 },
-      { id: 'suppliers', label: 'Relacionamento Fornecedores', visible: true, order: 6 },
-      { id: 'debt_management', label: 'Gestão de Dívidas', visible: true, order: 7 },
-      { id: 'stock_value', label: 'Patrimônio em Estoque', visible: true, order: 8 },
-      { id: 'estimated_profit', label: 'Lucro Total Estimado', visible: true, order: 9 },
-      { id: 'checks', label: 'Relatório de Cheques', visible: true, order: 10 },
-      { id: 'activity', label: 'Atividade Recente', visible: true, order: 11 },
-      { id: 'monthly_profit_detailed', label: 'Análise de Lucro Detalhada', visible: true, order: 12 },
+      { id: 'reports_shortcut', label: 'Atalho Relatórios', visible: true, order: 1 },
+      { id: 'cash_flow', label: 'Balanço Mensal', visible: true, order: 2 },
+      { id: 'receivables', label: 'A Receber (Vendas)', visible: true, order: 3 },
+      { id: 'manual_entry', label: 'Lançamentos Manuais', visible: true, order: 4 },
+      { id: 'stock_alerts', label: 'Alertas de Estoque', visible: true, order: 5 },
+      { id: 'customers', label: 'Relacionamento Clientes', visible: true, order: 6 },
+      { id: 'suppliers', label: 'Relacionamento Fornecedores', visible: true, order: 7 },
+      { id: 'debt_management', label: 'Gestão de Dívidas', visible: true, order: 8 },
+      { id: 'stock_value', label: 'Patrimônio em Estoque', visible: true, order: 9 },
+      { id: 'estimated_profit', label: 'Lucro Total Estimado', visible: true, order: 10 },
+      { id: 'checks', label: 'Relatório de Cheques', visible: true, order: 11 },
+      { id: 'activity', label: 'Atividade Recente', visible: true, order: 12 },
+      { id: 'monthly_profit_detailed', label: 'Análise de Lucro Detalhada', visible: true, order: 13 },
     ]
   };
 
@@ -308,6 +309,7 @@ export default function App() {
     if (view === ViewType.PURCHASE_FORM) setSelectedPurchaseId(id);
     if (view === ViewType.SALE_FORM) setSelectedSaleId(id);
     if (view === ViewType.PERSON_DETAIL) setSelectedPersonId(id);
+    if (view === ViewType.REPORT_DETAILED) setSelectedReportId(id);
     setSearchContext(search);
 
     setCurrentView(view);
@@ -1043,6 +1045,7 @@ export default function App() {
             onDeletePurchase={(id) => firebaseService.deleteDocument("purchases", id)}
             onDeleteSale={(id) => firebaseService.deleteDocument("sales", id)}
             onResetDatabase={handleResetDatabase}
+            onLogout={logout}
           />
         );
       case ViewType.PRODUCT_FORM:
@@ -1067,6 +1070,7 @@ export default function App() {
           <PurchasesView
             purchases={purchases}
             suppliers={suppliers}
+            products={products}
             onAdd={() => navigateTo(ViewType.PURCHASE_FORM)}
             onEdit={(id) => navigateTo(ViewType.PURCHASE_FORM, id)}
             onDelete={async (id) => {
@@ -1540,6 +1544,18 @@ export default function App() {
                 alert("Transferência realizada com sucesso!");
               }
             }}
+            onSetDefault={async (id) => {
+              try {
+                for (const acc of accounts) {
+                  const shouldBeDefault = acc.id === id;
+                  if (acc.isDefault !== shouldBeDefault) {
+                    await firebaseService.updateDocument("accounts", acc.id, { isDefault: shouldBeDefault });
+                  }
+                }
+              } catch (err) {
+                console.error("Erro ao definir conta padrão:", err);
+              }
+            }}
             isDarkMode={isDarkMode}
           />
         );
@@ -1648,8 +1664,8 @@ export default function App() {
                 }
               }
 
-              // 2. Create New Transactions from paymentHistory
-              if (sale.paymentHistory && sale.paymentHistory.length > 0) {
+              // 2. Create New Transactions from paymentHistory if it is a SALE
+              if (sale.status === SaleStatus.SALE && sale.paymentHistory && sale.paymentHistory.length > 0) {
                 for (const p of sale.paymentHistory) {
                   const newTransaction: Omit<Transaction, "id"> = {
                     type: TransactionType.INCOME,
@@ -1680,18 +1696,30 @@ export default function App() {
 
               // 3. Update Customer Credit (Haver)
               if (sale.customerId) {
-                const amountPaid = sale.paymentHistory?.reduce((acc, p) => acc + p.amount, 0) || 0;
-                const surplus = Math.max(0, amountPaid - sale.total);
-                
-                const prevAmountPaid = prevSale?.paymentHistory?.reduce((acc, p) => acc + p.amount, 0) || 0;
-                const prevSurplus = Math.max(0, prevAmountPaid - (prevSale?.total || 0));
-
                 const customer = people.find(p => p.id === sale.customerId);
                 if (customer) {
-                  const currentCredit = customer.credit || 0;
-                  const newCredit = currentCredit - prevSurplus + surplus;
-                  if (newCredit !== currentCredit) {
-                    await firebaseService.updateDocument("people", sale.customerId, { credit: newCredit });
+                  let creditAdjustment = 0;
+                  
+                  // Revert old surplus if prevSale was a SALE
+                  if (prevSale && prevSale.status === SaleStatus.SALE) {
+                    const prevAmountPaid = prevSale.paymentHistory?.reduce((acc, p) => acc + p.amount, 0) || 0;
+                    const prevSurplus = Math.max(0, prevAmountPaid - prevSale.total);
+                    creditAdjustment -= prevSurplus;
+                  }
+                  
+                  // Apply new surplus if current sale is a SALE
+                  if (sale.status === SaleStatus.SALE) {
+                    const amountPaid = sale.paymentHistory?.reduce((acc, p) => acc + p.amount, 0) || 0;
+                    const surplus = Math.max(0, amountPaid - sale.total);
+                    creditAdjustment += surplus;
+                  }
+                  
+                  if (creditAdjustment !== 0) {
+                    const currentCredit = customer.credit || 0;
+                    const newCredit = Math.max(0, currentCredit + creditAdjustment);
+                    if (newCredit !== currentCredit) {
+                      await firebaseService.updateDocument("people", sale.customerId, { credit: newCredit });
+                    }
                   }
                 }
               }
@@ -1886,13 +1914,6 @@ export default function App() {
                 </motion.div>
               )}
             </AnimatePresence>
-          </button>
-          <button 
-            onClick={logout}
-            title="Sair do aplicativo"
-            aria-label="Sair do aplicativo"
-          >
-            <LogOut size={20} />
           </button>
         </div>
       </header>

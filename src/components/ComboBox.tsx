@@ -37,18 +37,24 @@ export default function ComboBox({ options, value, onChange, placeholder = "SELE
         className={`w-full flex items-center justify-between bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl px-5 py-4 cursor-pointer focus-within:ring-4 focus-within:ring-slate-900/5 dark:focus-within:ring-indigo-500/10 transition-all ${isDarkMode ? "text-slate-100" : "text-slate-900"}`}
         onClick={() => setIsOpen(!isOpen)}
       >
-        <input
-          type="text"
-          className="w-full bg-transparent border-none outline-none text-[12px] font-black uppercase tracking-widest placeholder:text-slate-400 dark:placeholder:text-slate-500"
-          placeholder={selectedOption ? selectedOption.name : placeholder}
-          value={isOpen ? search : ""}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setIsOpen(true);
-          }}
-          onClick={(e) => e.stopPropagation()}
-        />
-        <ChevronDown size={14} className="text-indigo-400" strokeWidth={3} />
+        <div className="flex-1 min-w-0">
+          {isOpen ? (
+            <input
+              type="text"
+              autoFocus
+              className="w-full bg-transparent border-none outline-none text-[12px] font-black uppercase tracking-widest text-slate-900 dark:text-slate-100"
+              placeholder={placeholder}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <span className={`text-[12px] font-black uppercase tracking-widest truncate block ${selectedOption ? (isDarkMode ? "text-indigo-400" : "text-indigo-600") : "text-slate-400 dark:text-slate-500"}`}>
+              {selectedOption ? selectedOption.name : placeholder}
+            </span>
+          )}
+        </div>
+        <ChevronDown size={14} className={isOpen ? "text-indigo-500" : "text-slate-400"} strokeWidth={3} />
       </div>
 
       {isOpen && (

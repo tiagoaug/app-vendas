@@ -17,18 +17,27 @@ import {
   ChevronUp,
   Search,
   Filter,
-  X,
-  RefreshCcw,
+  ArrowUpRight,
+  ArrowDownRight,
+  ShoppingCart,
+  Users,
   AlertCircle,
-  Hash,
   Calendar,
-  Copy,
-  FileDown,
+  ArrowRight,
+  Plus,
+  ChevronRight,
+  BarChart3,
+  Download,
+  Trash2,
+  Edit2,
   Clipboard,
-  Landmark,
-  User,
-  Plus
+  Copy,
+  Send,
+  FileDown,
+  FileText,
+  Share2
 } from "lucide-react";
+import { sharePDF } from '../utils/pdfShare';
 import { format, differenceInDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { jsPDF } from 'jspdf';
@@ -203,7 +212,7 @@ export default function DashboardView({
       styles: { fontSize: 8, cellPadding: 3 }
     });
 
-    doc.save(`relatorio_cheques_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
+    sharePDF(doc, `relatorio_cheques_${format(new Date(), 'yyyyMMdd_HHmm')}.pdf`);
   };
 
   const suppliersWithDebts = useMemo(() => {
@@ -562,7 +571,8 @@ export default function DashboardView({
           categoryId: t.categoryId,
           categoryName: category?.name || "Sem Categoria",
           debt: t.amount,
-          type: 'TRANSACTION' as const
+          type: 'TRANSACTION' as const,
+          transactionNumber: t.transactionNumber
         };
       });
 
@@ -965,7 +975,7 @@ export default function DashboardView({
                     <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Títulos Recentes</p>
                     <div className="space-y-2">
                       {filteredDebtData.list.slice(0, 3).map((p, i) => (
-                        <div key={`recent-debt-${i}`} onClick={() => p.type === 'PURCHASE' ? onNavigate(ViewType.PURCHASE_FORM, p.id) : onNavigate(ViewType.FINANCIAL)} className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all hover:translate-x-1 ${isDarkMode ? 'bg-slate-950 border-slate-800 hover:border-rose-500/30' : 'bg-white border-slate-50 hover:border-rose-200'}`}><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-lg flex items-center justify-center ${p.debt > 0 ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>{p.debt > 0 ? <Clock size={14} /> : <CheckCircle2 size={14} />}</div><div><p className="text-[10px] font-black uppercase text-current leading-none">{p.supplierName}</p><p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-1">{format(p.date, 'dd MMM yyyy', { locale: ptBR })} • {p.categoryName}</p></div></div><p className={`text-[10px] font-black ${p.debt > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>R$ {p.debt.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p></div>
+                        <div key={`recent-debt-${i}`} onClick={() => p.type === 'PURCHASE' ? onNavigate(ViewType.PURCHASE_FORM, p.id) : onNavigate(ViewType.FINANCIAL)} className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all hover:translate-x-1 ${isDarkMode ? 'bg-slate-950 border-slate-800 hover:border-rose-500/30' : 'bg-white border-slate-50 hover:border-rose-200'}`}><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-lg flex items-center justify-center ${p.debt > 0 ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>{p.debt > 0 ? <Clock size={14} /> : <CheckCircle2 size={14} />}</div><div><div className="flex items-center gap-1.5"><p className="text-[10px] font-black uppercase text-current leading-none">{p.supplierName}</p>{(p as any).transactionNumber && <span className="text-[8px] font-black bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 uppercase tracking-tighter">#{ (p as any).transactionNumber }</span>}</div></div></div><p className={`text-[10px] font-black ${p.debt > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>R$ {p.debt.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p></div>
                       ))}
                     </div>
                   </div>
@@ -1013,7 +1023,7 @@ export default function DashboardView({
                   <div className="p-6 pb-2">
                     <div className="flex items-center justify-between mb-6"><div><h2 className={`text-lg font-black uppercase tracking-tight ${isDarkMode ? "text-white" : "text-slate-800"}`}>Relatório de Cheques</h2><p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Gestão Unificada de Documentos</p></div><div className="flex items-center gap-2"><div className={`p-2.5 rounded-xl ${isDarkMode ? 'bg-amber-900/20 text-amber-500' : 'bg-amber-50 text-amber-600'}`}><CreditCard size={20} strokeWidth={2.5} /></div></div></div>
                     <div className="flex flex-col gap-4">
-                      <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2"><Clipboard size={14} className="text-indigo-500" /><span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Total: {filteredChecks.length} cheques</span></div><div className="flex items-center gap-2"><button className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[8px] font-black uppercase tracking-widest hover:bg-indigo-50 transition-all border border-slate-100 dark:border-slate-700 active:scale-95" onClick={() => { const summary = filteredChecks.map(c => `${c.number} - R$ ${c.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} - ${format(c.dueDate, 'dd/MM/yyyy')}`).join('\n'); navigator.clipboard.writeText(summary); alert('Lista de cheques copiada!'); }}><Copy size={12} />Copiar</button><button onClick={downloadChecksPDF} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 text-[8px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all border border-indigo-100 dark:border-indigo-900/50 active:scale-95"><FileDown size={14} />PDF</button></div></div>
+                      <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2"><Clipboard size={14} className="text-indigo-500" /><span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Total: {filteredChecks.length} cheques</span></div><div className="flex items-center gap-2"><button className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[8px] font-black uppercase tracking-widest hover:bg-indigo-50 transition-all border border-slate-100 dark:border-slate-700 active:scale-95" onClick={() => { const summary = filteredChecks.map(c => `${c.number} - R$ ${c.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} - ${format(c.dueDate, 'dd/MM/yyyy')}`).join('\n'); navigator.clipboard.writeText(summary); alert('Lista de cheques copiada!'); }}><Copy size={12} />Copiar</button><button onClick={downloadChecksPDF} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 text-[8px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all border border-indigo-100 dark:border-indigo-900/50 active:scale-95"><Share2 size={14} />Exportar PDF</button></div></div>
                       <div className="relative"><Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 dark:text-slate-600" size={16} /><input type="text" placeholder="BUSCAR POR NÚMERO OU FORNECEDOR..." className="w-full bg-slate-50 dark:bg-slate-950 border-none rounded-2xl pl-12 pr-4 py-3.5 text-[11px] font-black uppercase tracking-widest placeholder:text-slate-300 dark:placeholder:text-slate-800 focus:ring-4 focus:ring-indigo-500/5 transition-all text-slate-800 dark:text-white" value={checksSearch} onChange={(e) => setChecksSearch(e.target.value)} />{checksSearch && (<button onClick={() => setChecksSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" title="Limpar busca"><X size={14} /></button>)}</div>
                       <div className="flex gap-2 p-1 bg-slate-50 dark:bg-slate-950 rounded-2xl overflow-x-auto no-scrollbar">{(['PENDING', 'OVERDUE', 'CLEARED', 'ALL'] as const).map((status) => (<button key={status} onClick={() => setChecksStatusFilter(status)} className={`flex-1 py-2 px-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${checksStatusFilter === status ? 'bg-white dark:bg-slate-800 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-700'}`}>{status === 'PENDING' ? 'A Vencer' : status === 'CLEARED' ? 'Compensados' : status === 'OVERDUE' ? 'Vencidos' : 'Todos'}</button>))}</div>
                     </div>
@@ -1189,6 +1199,69 @@ export default function DashboardView({
                     </div>
                   </div>
                 </div>
+              </div>
+            );
+
+          case "reports_shortcut":
+            return (
+              <div key="reports_shortcut" className={`p-6 rounded-[2rem] border shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-none flex flex-col gap-5 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className={`text-[13px] font-black uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+                      Central de Relatórios
+                    </h3>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest leading-none mt-1">
+                      Analíticos & Gráficos
+                    </p>
+                  </div>
+                  <motion.div 
+                    animate={{ 
+                      scale: [1, 1.1, 1],
+                      rotate: [0, 5, -5, 0]
+                    }}
+                    transition={{ 
+                      duration: 4, 
+                      repeat: Infinity, 
+                      ease: "easeInOut" 
+                    }}
+                    className={`p-2.5 rounded-xl ${isDarkMode ? 'bg-indigo-900/30 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}
+                  >
+                    <BarChart3 size={20} strokeWidth={2.5} />
+                  </motion.div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => onNavigate(ViewType.REPORT_DETAILED, "ventas-periodo")}
+                    className={`flex flex-col items-center justify-center gap-2 py-4 rounded-2xl transition-all active:scale-95 ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-50 hover:bg-slate-100'}`}
+                  >
+                    <TrendingUp size={20} className="text-emerald-500" />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Vendas</span>
+                  </button>
+                  <button
+                    onClick={() => onNavigate(ViewType.REPORT_DETAILED, "desempenho-financeiro")}
+                    className={`flex flex-col items-center justify-center gap-2 py-4 rounded-2xl transition-all active:scale-95 ${isDarkMode ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-50 hover:bg-slate-100'}`}
+                  >
+                    <DollarSign size={20} className="text-amber-500" />
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">Financeiro</span>
+                  </button>
+                </div>
+                
+                <motion.button
+                  onClick={() => onNavigate(ViewType.REPORTS)}
+                  animate={{
+                    borderColor: isDarkMode ? ['#1e293b', '#6366f1', '#1e293b'] : ['#e2e8f0', '#6366f1', '#e2e8f0'],
+                    backgroundColor: isDarkMode ? ['rgba(15, 23, 42, 0)', 'rgba(99, 102, 241, 0.05)', 'rgba(15, 23, 42, 0)'] : ['rgba(255, 255, 255, 0)', 'rgba(99, 102, 241, 0.03)', 'rgba(255, 255, 255, 0)']
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                  className="w-full py-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-500 hover:border-indigo-500/50 transition-all flex items-center justify-center gap-2"
+                >
+                  Ver Todos os Relatórios <ChevronRight size={14} />
+                </motion.button>
               </div>
             );
 

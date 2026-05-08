@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Purchase,
   Product,
@@ -103,16 +103,17 @@ export default function PurchaseFormView({
     });
     return Object.values(b);
   });
-  
+
   const [expandedBlocks, setExpandedBlocks] = useState<string[]>([]);
-  
+
   const [generalItems, setGeneralItems] = useState<GeneralPurchaseItem[]>(
     existing?.generalItems || [],
   );
   const [notes, setNotes] = useState(existing?.notes || "");
+  const [sellerName, setSellerName] = useState(existing?.sellerName || "");
   const [batchNumber, setBatchNumber] = useState(
     existing?.batchNumber ||
-      `LOT-${Date.now().toString().slice(-5).toUpperCase()}`,
+    `LOT-${Date.now().toString().slice(-5).toUpperCase()}`,
   );
   const [isAutoBatchNumber, setIsAutoBatchNumber] = useState(!existing?.batchNumber);
   const [dueDate, setDueDate] = useState<number>(
@@ -126,11 +127,15 @@ export default function PurchaseFormView({
     existing?.categoryId || categories[0]?.id || "",
   );
   const [accountId, setAccountId] = useState(
-    existing?.accountId || accounts[0]?.id || "",
+    existing?.accountId || accounts.find(a => a.isDefault)?.id || accounts[0]?.id || "",
   );
   const [generateTransaction, setGenerateTransaction] = useState(
     existing?.generateTransaction !== undefined ? existing?.generateTransaction : true
   );
+
+  const initialDataLoaded = useRef(false);
+
+
 
   const activeProducts = useMemo(
     () =>
@@ -155,6 +160,52 @@ export default function PurchaseFormView({
   const [showProductModal, setShowProductModal] = useState(false);
   const [productSearchQuery, setProductSearchQuery] = useState("");
 
+  // Sync state if existing purchase arrives late
+  useEffect(() => {
+    if (existing && !initialDataLoaded.current) {
+      setType(existing.type || PurchaseType.GENERAL);
+      setSupplierId(existing.supplierId || "");
+      setGeneralItems(existing.generalItems || []);
+      setNotes(existing.notes || "");
+      setSellerName(existing.sellerName || "");
+      setBatchNumber(existing.batchNumber || "");
+      setIsAutoBatchNumber(false);
+      setDueDate(existing.dueDate || Date.now());
+      setPaymentTerm(existing.paymentTerm || PaymentTerm.CASH);
+      setChecks(existing.checks || []);
+      setCategoryId(existing.categoryId || "");
+      setAccountId(existing.accountId || "");
+      setGenerateTransaction(existing.generateTransaction !== undefined ? existing.generateTransaction : true);
+      setShowNotes(!!existing.notes);
+      setShowChecks(existing.checks && existing.checks.length > 0 ? true : false);
+
+      if (existing.items && existing.items.length > 0) {
+        const b: Record<string, PurchaseBlock> = {};
+        existing.items.forEach((item) => {
+          const key = `${item.productId}-${item.isBox}-${item.cost}`;
+          if (!b[key]) {
+            b[key] = {
+              id: Math.random().toString(36).substr(2, 9),
+              productId: item.productId,
+              isBox: item.isBox,
+              cost: item.cost,
+              variations: {},
+            };
+          }
+          if (!b[key].variations[item.variationId]) {
+            b[key].variations[item.variationId] = { quantity: 0, size: "" };
+          }
+          b[key].variations[item.variationId].quantity += item.quantity;
+          b[key].variations[item.variationId].size =
+            item.size || b[key].variations[item.variationId].size;
+        });
+        setBlocks(Object.values(b));
+      }
+
+      initialDataLoaded.current = true;
+    }
+  }, [existing]);
+
   const supplierName = useMemo(() => {
     return suppliers.find((s) => s.id === supplierId)?.name || "";
   }, [suppliers, supplierId]);
@@ -172,7 +223,7 @@ export default function PurchaseFormView({
   const addBlock = (pId: string) => {
     const p = products.find(prod => prod.id === pId);
     if (!p) return;
-    
+
     const newId = Math.random().toString(36).substr(2, 9);
     setBlocks([
       ...blocks,
@@ -307,12 +358,13 @@ export default function PurchaseFormView({
       checks,
       generateTransaction,
       paymentStatus: paymentTerm === PaymentTerm.INSTALLMENTS ? PaymentStatus.PENDING : PaymentStatus.PAID,
+      sellerName,
     });
   };
 
   const openCalculator = (index: number, type: 'blocks' | 'generalItems') => {
     let value = 0;
-    if(type === 'generalItems') {
+    if (type === 'generalItems') {
       value = generalItems[index].value || 0;
     } else {
       value = blocks[index].cost || 0;
@@ -366,13 +418,37 @@ export default function PurchaseFormView({
             <label className="text-[9px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 mb-2 block tracking-widest leading-none">
               Fornecedor Selecionado
             </label>
-            <ComboBox 
+            <ComboBox
               options={suppliers.map(s => ({ id: s.id, name: s.name }))}
               value={supplierId}
               onChange={setSupplierId}
               placeholder="SELECIONE O FORNECEDOR"
               isDarkMode={isDarkMode}
             />
+          </div>
+
+          <div className="relative col-span-2">
+            <label className="text-[9px] uppercase font-black text-slate-400 dark:text-slate-500 px-3 mb-2 block tracking-widest leading-none">Vendedor do Fornecedor</label>
+            <div className="relative">
+              <select
+                className={`w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-4 text-[11px] font-black uppercase appearance-none text-slate-700 dark:text-slate-200 cursor-pointer pr-10 ${(!suppliers.find(s => s.id === supplierId)?.sellers || suppliers.find(s => s.id === supplierId)?.sellers?.length === 0) ? 'opacity-50' : ''}`}
+                value={sellerName}
+                onChange={(e) => setSellerName(e.target.value)}
+                disabled={!suppliers.find(s => s.id === supplierId)?.sellers || suppliers.find(s => s.id === supplierId)?.sellers?.length === 0}
+              >
+                {(!suppliers.find(s => s.id === supplierId)?.sellers || suppliers.find(s => s.id === supplierId)?.sellers?.length === 0) ? (
+                  <option value="">CADASTRE UM VENDEDOR NO FORNECEDOR</option>
+                ) : (
+                  <>
+                    <option value="">NENHUM VENDEDOR</option>
+                    {(suppliers.find(s => s.id === supplierId)?.sellers || []).map(seller => (
+                      <option key={seller} value={seller}>{seller}</option>
+                    ))}
+                  </>
+                )}
+              </select>
+              <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
           </div>
 
           <div className="relative col-span-2">
@@ -413,7 +489,7 @@ export default function PurchaseFormView({
             <div className="flex items-center gap-3 mb-2 px-3">
               <label className="flex items-center gap-2 cursor-pointer group">
                 <div className="relative">
-                  <input 
+                  <input
                     type="checkbox"
                     className="sr-only"
                     checked={isAutoBatchNumber}
@@ -705,14 +781,14 @@ export default function PurchaseFormView({
                             ))}
                         </select>
                         <div className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2 mr-2">
-                           <ChevronDown size={14} className="text-indigo-400" strokeWidth={3} />
+                          <ChevronDown size={14} className="text-indigo-400" strokeWidth={3} />
                         </div>
                         <p className="text-[9px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-widest mt-1">
                           REF: {product?.reference || "---"}
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => toggleBlockExpanded(block.id)}
@@ -735,138 +811,138 @@ export default function PurchaseFormView({
 
                   {isExpanded && (
                     <div className="p-5 pt-0 border-t border-slate-50 dark:border-slate-800 mt-2">
-                       <div className="grid grid-cols-2 gap-3 mt-4 mb-5">
-                          <div className="flex flex-col gap-2">
-                            <label className="text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-widest px-1">
-                              Unidade
-                            </label>
+                      <div className="grid grid-cols-2 gap-3 mt-4 mb-5">
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-widest px-1">
+                            Unidade
+                          </label>
+                          <button
+                            onClick={() => updateBlock(index, { isBox: !block.isBox })}
+                            className={`text-[9px] font-black py-3 rounded-2xl border-2 uppercase tracking-widest transition-all ${block.isBox ? "bg-slate-900 dark:bg-amber-600 text-white border-slate-900 dark:border-amber-600 shadow-lg" : "bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-100 dark:border-slate-700"}`}
+                            aria-label="Alternar unidade"
+                            title="Unidade"
+                          >
+                            {product.type === SaleType.WHOLESALE ? (block.isBox ? "Grade Fechada" : "Avulso") : (block.isBox ? "Caixa (12 Prs)" : "Par Individual")}
+                          </button>
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-widest px-1 text-right">
+                            Custo
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              step="0.01"
+                              className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl py-3 text-right pr-4 text-[13px] font-black text-slate-800 dark:text-slate-100 focus:ring-4 focus:ring-slate-900/5 dark:focus:ring-amber-500/10 transition-all"
+                              value={block.cost}
+                              onChange={(e) => updateBlock(index, { cost: parseFloat(e.target.value) || 0 })}
+                              aria-label="Custo do item"
+                              title="Custo"
+                            />
                             <button
-                              onClick={() => updateBlock(index, { isBox: !block.isBox })}
-                              className={`text-[9px] font-black py-3 rounded-2xl border-2 uppercase tracking-widest transition-all ${block.isBox ? "bg-slate-900 dark:bg-amber-600 text-white border-slate-900 dark:border-amber-600 shadow-lg" : "bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-100 dark:border-slate-700"}`}
-                              aria-label="Alternar unidade"
-                              title="Unidade"
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                openCalculator(index, 'blocks');
+                              }}
+                              className="w-[45px] shrink-0 flex items-center justify-center bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-2xl hover:bg-indigo-100 transition-colors"
+                              aria-label="Abrir calculadora de custo"
+                              title="Calculadora"
                             >
-                              {product.type === SaleType.WHOLESALE ? (block.isBox ? "Grade Fechada" : "Avulso") : (block.isBox ? "Caixa (12 Prs)" : "Par Individual")}
+                              <Calculator size={18} strokeWidth={2.5} />
                             </button>
                           </div>
-                          
-                          <div className="flex flex-col gap-2">
-                            <label className="text-[8px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-widest px-1 text-right">
-                              Custo
-                            </label>
-                            <div className="flex gap-2">
-                              <input
-                                type="number"
-                                step="0.01"
-                                className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl py-3 text-right pr-4 text-[13px] font-black text-slate-800 dark:text-slate-100 focus:ring-4 focus:ring-slate-900/5 dark:focus:ring-amber-500/10 transition-all"
-                                value={block.cost}
-                                onChange={(e) => updateBlock(index, { cost: parseFloat(e.target.value) || 0 })}
-                                aria-label="Custo do item"
-                                title="Custo"
-                              />
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  openCalculator(index, 'blocks');
-                                }}
-                                className="w-[45px] shrink-0 flex items-center justify-center bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-2xl hover:bg-indigo-100 transition-colors"
-                                aria-label="Abrir calculadora de custo"
-                                title="Calculadora"
-                              >
-                                <Calculator size={18} strokeWidth={2.5} />
-                              </button>
-                            </div>
-                          </div>
-                       </div>
+                        </div>
+                      </div>
 
-                       <div className="flex flex-col gap-3">
-                         <h4 className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-1 flex justify-between items-end">
-                            <span>Variações</span>
-                         </h4>
-                         
-                         {product.variations.map((v) => {
-                            const variationState = block.variations[v.id] || { quantity: 0, size: "" };
-                            const quantity = variationState.quantity;
-                            const size = variationState.size;
-                            
-                            const variationKey = product.type === SaleType.RETAIL && size && !block.isBox ? size : 'WHOLESALE';
-                            const stock = v.stock?.[variationKey] || 0;
-                            const minStock = v.minStock || 0;
-                            
-                            let stockColor = "text-emerald-500"; // OK
-                            if (stock <= 0) stockColor = "text-rose-500"; // Vazio
-                            else if (stock <= minStock) stockColor = "text-amber-500"; // Perto do mínimo
+                      <div className="flex flex-col gap-3">
+                        <h4 className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest mb-1 flex justify-between items-end">
+                          <span>Variações</span>
+                        </h4>
 
-                            return (
-                              <div key={v.id} className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
-                                <div className="flex items-center gap-3">
-                                   <div className="flex flex-col">
-                                      <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
-                                        {v.colorName}
-                                      </span>
-                                      <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-0.5">
-                                        Estoque: <span className={stockColor}>{stock}</span>
-                                      </span>
-                                   </div>
-                                </div>
-                                
-                                <div className="flex flex-col items-end gap-2">
-                                  {!block.isBox && product.type === SaleType.RETAIL && (
-                                    <select
-                                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-1 px-4 text-center text-[9px] font-black text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-amber-500/20 transition-all appearance-none outline-none"
-                                      value={size}
-                                      onChange={(e) => updateVariation(index, v.id, quantity, e.target.value)}
-                                      aria-label={`Selecionar tamanho para ${v.colorName}`}
-                                      title="Tamanho"
-                                    >
-                                      <option value="">TAM.</option>
-                                      {grids.find(g => g.id === product.defaultGridId)?.sizes.map(s => (
-                                        <option key={s} value={s}>{s}</option>
-                                      ))}
-                                    </select>
-                                  )}
-                                  
-                                  <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-1 shadow-sm">
-                                    <button
-                                      type="button"
-                                      onClick={() => updateVariation(index, v.id, Math.max(0, quantity - 1), size)}
-                                      className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
-                                      aria-label="Diminuir quantidade"
-                                      title="Diminuir"
-                                    >
-                                      <Minus size={14} strokeWidth={2.5} />
-                                    </button>
-                                    <span className="w-6 text-center font-black text-[11px] text-slate-800 dark:text-slate-100">
-                                      {quantity}
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => updateVariation(index, v.id, quantity + 1, size)}
-                                      className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 transition-colors"
-                                      aria-label="Aumentar quantidade"
-                                      title="Aumentar"
-                                    >
-                                      <Plus size={14} strokeWidth={2.5} />
-                                    </button>
-                                  </div>
+                        {product.variations.map((v) => {
+                          const variationState = block.variations[v.id] || { quantity: 0, size: "" };
+                          const quantity = variationState.quantity;
+                          const size = variationState.size;
+
+                          const variationKey = product.type === SaleType.RETAIL && size && !block.isBox ? size : 'WHOLESALE';
+                          const stock = v.stock?.[variationKey] || 0;
+                          const minStock = v.minStock || 0;
+
+                          let stockColor = "text-emerald-500"; // OK
+                          if (stock <= 0) stockColor = "text-rose-500"; // Vazio
+                          else if (stock <= minStock) stockColor = "text-amber-500"; // Perto do mínimo
+
+                          return (
+                            <div key={v.id} className="flex items-center justify-between p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50">
+                              <div className="flex items-center gap-3">
+                                <div className="flex flex-col">
+                                  <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                                    {v.colorName}
+                                  </span>
+                                  <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest mt-0.5">
+                                    Estoque: <span className={stockColor}>{stock}</span>
+                                  </span>
                                 </div>
                               </div>
-                            );
-                         })}
-                       </div>
 
-                       <div className="mt-4">
-                         <input
-                           type="text"
-                           placeholder="Observações do item..."
-                           className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl py-3 px-4 text-[10px] font-bold text-slate-600 dark:text-slate-300 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-900/5 dark:focus:ring-white/10 transition-all uppercase tracking-widest"
-                           value={block.note || ''}
-                           onChange={(e) => updateBlock(index, { note: e.target.value })}
-                           aria-label="Observações do item"
-                           title="Notas do Item"
-                         />
-                       </div>
+                              <div className="flex flex-col items-end gap-2">
+                                {!block.isBox && product.type === SaleType.RETAIL && (
+                                  <select
+                                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl py-1 px-4 text-center text-[9px] font-black text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-amber-500/20 transition-all appearance-none outline-none"
+                                    value={size}
+                                    onChange={(e) => updateVariation(index, v.id, quantity, e.target.value)}
+                                    aria-label={`Selecionar tamanho para ${v.colorName}`}
+                                    title="Tamanho"
+                                  >
+                                    <option value="">TAM.</option>
+                                    {grids.find(g => g.id === product.defaultGridId)?.sizes.map(s => (
+                                      <option key={s} value={s}>{s}</option>
+                                    ))}
+                                  </select>
+                                )}
+
+                                <div className="flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-1 shadow-sm">
+                                  <button
+                                    type="button"
+                                    onClick={() => updateVariation(index, v.id, Math.max(0, quantity - 1), size)}
+                                    className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                                    aria-label="Diminuir quantidade"
+                                    title="Diminuir"
+                                  >
+                                    <Minus size={14} strokeWidth={2.5} />
+                                  </button>
+                                  <span className="w-6 text-center font-black text-[11px] text-slate-800 dark:text-slate-100">
+                                    {quantity}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateVariation(index, v.id, quantity + 1, size)}
+                                    className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 transition-colors"
+                                    aria-label="Aumentar quantidade"
+                                    title="Aumentar"
+                                  >
+                                    <Plus size={14} strokeWidth={2.5} />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="mt-4">
+                        <input
+                          type="text"
+                          placeholder="Observações do item..."
+                          className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl py-3 px-4 text-[10px] font-bold text-slate-600 dark:text-slate-300 placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-900/5 dark:focus:ring-white/10 transition-all uppercase tracking-widest"
+                          value={block.note || ''}
+                          onChange={(e) => updateBlock(index, { note: e.target.value })}
+                          aria-label="Observações do item"
+                          title="Notas do Item"
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1057,23 +1133,23 @@ export default function PurchaseFormView({
         className={`p-6 rounded-[2.5rem] border shadow-sm flex items-center justify-between mt-2 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}
       >
         <div className="flex items-center gap-3">
-           <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500`}>
-              <CreditCard size={18} strokeWidth={2.5} />
-           </div>
-           <div>
-              <p className="text-[10px] uppercase tracking-widest font-black text-slate-800 dark:text-white">Contabilizar Financeiro</p>
-              <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-tight mt-0.5 max-w-[200px]">Descontar da conta</p>
-           </div>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-50 dark:bg-emerald-900/20 text-emerald-500`}>
+            <CreditCard size={18} strokeWidth={2.5} />
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-widest font-black text-slate-800 dark:text-white">Contabilizar Financeiro</p>
+            <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-tight mt-0.5 max-w-[200px]">Descontar da conta</p>
+          </div>
         </div>
         <label className="relative inline-flex items-center cursor-pointer">
-           <input
-             type="checkbox"
-             className="sr-only peer"
-             checked={generateTransaction}
-             onChange={(e) => setGenerateTransaction(e.target.checked)}
-             aria-label="Contabilizar no financeiro"
-           />
-           <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-500 dark:peer-checked:bg-emerald-400 border-2 border-transparent"></div>
+          <input
+            type="checkbox"
+            className="sr-only peer"
+            checked={generateTransaction}
+            onChange={(e) => setGenerateTransaction(e.target.checked)}
+            aria-label="Contabilizar no financeiro"
+          />
+          <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-emerald-500 dark:peer-checked:bg-emerald-400 border-2 border-transparent"></div>
         </label>
       </div>
 
@@ -1112,9 +1188,9 @@ export default function PurchaseFormView({
         isDarkMode={isDarkMode}
         initialValue={calcModal?.value || 0}
         onResult={(res) => {
-            if (!calcModal) return;
-            if (calcModal.field === 'generalItems') updateGeneralItem(calcModal.index, { value: res });
-            if (calcModal.field === 'blocks') updateBlock(calcModal.index, { cost: res });
+          if (!calcModal) return;
+          if (calcModal.field === 'generalItems') updateGeneralItem(calcModal.index, { value: res });
+          if (calcModal.field === 'blocks') updateBlock(calcModal.index, { cost: res });
         }}
       />
 
@@ -1128,8 +1204,8 @@ export default function PurchaseFormView({
                 <h2 className="text-sm font-black uppercase tracking-widest text-slate-800 dark:text-white">Selecionar Modelo</h2>
                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Busque pelo nome ou referência</p>
               </div>
-              <button 
-                onClick={() => setShowProductModal(false)} 
+              <button
+                onClick={() => setShowProductModal(false)}
                 className="w-10 h-10 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"
                 aria-label="Fechar"
                 title="Fechar"
@@ -1140,19 +1216,19 @@ export default function PurchaseFormView({
 
             {/* Search */}
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
-               <div className="relative">
-                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400" size={18} strokeWidth={3} />
-                 <input 
-                   type="text" 
-                   autoFocus
-                   placeholder="Buscar modelo..."
-                   className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl pl-12 pr-4 py-4 text-sm font-bold placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-indigo-500/10 transition-all text-slate-800 dark:text-white"
-                   value={productSearchQuery}
-                   onChange={(e) => setProductSearchQuery(e.target.value)}
-                   aria-label="Pesquisar produto"
-                   title="Pesquisar"
-                 />
-               </div>
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-400" size={18} strokeWidth={3} />
+                <input
+                  type="text"
+                  autoFocus
+                  placeholder="Buscar modelo..."
+                  className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl pl-12 pr-4 py-4 text-sm font-bold placeholder:text-slate-300 dark:placeholder:text-slate-600 focus:ring-2 focus:ring-indigo-500/10 transition-all text-slate-800 dark:text-white"
+                  value={productSearchQuery}
+                  onChange={(e) => setProductSearchQuery(e.target.value)}
+                  aria-label="Pesquisar produto"
+                  title="Pesquisar"
+                />
+              </div>
             </div>
 
             {/* List */}
@@ -1167,11 +1243,10 @@ export default function PurchaseFormView({
                         key={p.id}
                         disabled={isAdded}
                         onClick={() => addBlock(p.id)}
-                        className={`flex items-center justify-between p-4 rounded-3xl transition-all border text-left ${
-                          isAdded 
-                          ? "bg-slate-50/50 dark:bg-slate-800/30 border-transparent opacity-50 cursor-not-allowed" 
-                          : "hover:bg-slate-50 dark:hover:bg-slate-800/50 border-transparent hover:border-slate-200 dark:hover:border-slate-700 bg-transparent active:scale-[0.98]"
-                        }`}
+                        className={`flex items-center justify-between p-4 rounded-3xl transition-all border text-left ${isAdded
+                            ? "bg-slate-50/50 dark:bg-slate-800/30 border-transparent opacity-50 cursor-not-allowed"
+                            : "hover:bg-slate-50 dark:hover:bg-slate-800/50 border-transparent hover:border-slate-200 dark:hover:border-slate-700 bg-transparent active:scale-[0.98]"
+                          }`}
                         aria-label={`Selecionar produto ${p.name}`}
                         title={p.name}
                       >

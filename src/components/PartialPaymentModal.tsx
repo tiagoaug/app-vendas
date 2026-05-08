@@ -27,7 +27,7 @@ export default function PartialPaymentModal({
 }: PartialPaymentModalProps) {
   const [viewMode, setViewMode] = useState<'PAYMENT' | 'HISTORY'>(initialMode);
   const [amount, setAmount] = useState<string>('');
-  const [accountId, setAccountId] = useState(accounts[0]?.id || '');
+  const [accountId, setAccountId] = useState(accounts.find(a => a.isDefault)?.id || accounts[0]?.id || '');
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 

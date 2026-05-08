@@ -84,4 +84,22 @@
   .animate-spin-slow {
     animation: spin-slow 3s linear infinite;
   }
+
+  @keyframes pulse-alert {
+    0% { color: var(--color-amber-400); transform: scale(1); filter: drop-shadow(0 0 2px rgba(251, 191, 36, 0.5)); }
+    50% { color: var(--color-rose-500); transform: scale(1.1); filter: drop-shadow(0 0 8px rgba(244, 63, 94, 0.8)); }
+    100% { color: var(--color-amber-400); transform: scale(1); filter: drop-shadow(0 0 2px rgba(251, 191, 36, 0.5)); }
+  }
+  .animate-pulse-alert {
+    animation: pulse-alert 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-blue {
+    0% { color: #60a5fa; transform: scale(1); filter: drop-shadow(0 0 2px rgba(96, 165, 250, 0.3)); }
+    50% { color: #2563eb; transform: scale(1.15); filter: drop-shadow(0 0 12px rgba(37, 99, 235, 0.6)); }
+    100% { color: #60a5fa; transform: scale(1); filter: drop-shadow(0 0 2px rgba(96, 165, 250, 0.3)); }
+  }
+  .animate-pulse-blue {
+    animation: pulse-blue 1.5s ease-in-out infinite;
+  }
 }

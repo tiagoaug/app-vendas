@@ -238,6 +238,11 @@ export default function FinancialView({
                 <h3 className={`font-black text-xs uppercase tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
                   {transaction.description}
                 </h3>
+                {transaction.transactionNumber && (
+                  <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 text-[7px] font-black uppercase tracking-widest">
+                    #{transaction.transactionNumber}
+                  </span>
+                )}
                 {transaction.relatedId && sales.find(s => s.id === transaction.relatedId) && (
                    <span className="px-2 py-0.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 text-[7px] font-black uppercase tracking-widest">VENDA</span>
                 )}
@@ -287,12 +292,26 @@ export default function FinancialView({
                 if (purchase) {
                   const supplier = people.find(p => p.id === purchase.supplierId);
                   return (
-                    <div className="mt-1.5 space-y-1">
+                    <div className="mt-1.5 space-y-1.5">
                       <div className="flex items-center gap-1.5">
                         <span className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">
                           {supplier?.name || 'Fornecedor'}
                         </span>
                       </div>
+                      
+                      {purchase.type === PurchaseType.GENERAL && purchase.generalItems && purchase.generalItems.length > 0 && (
+                        <div className={`p-2 rounded-xl border ${isDarkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                          <div className="space-y-1">
+                            {purchase.generalItems.map((item, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-[8px] font-bold uppercase tracking-tight">
+                                <span className={isDarkMode ? 'text-slate-400' : 'text-slate-500'}>{item.description}</span>
+                                <span className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>R$ {item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {purchase.notes && (
                         <p className="text-[8px] font-bold text-slate-400 uppercase truncate max-w-[200px]">
                           {purchase.notes}
@@ -302,10 +321,27 @@ export default function FinancialView({
                   );
                 }
 
-                if (transaction.contactName) {
+                if (transaction.contactName || (transaction.items && transaction.items.length > 0)) {
                   return (
-                    <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                      <User size={10} /> {transaction.contactName}
+                    <div className="mt-1.5 space-y-1.5">
+                      {transaction.contactName && (
+                        <div className="flex items-center gap-1 text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                          <User size={10} /> {transaction.contactName}
+                        </div>
+                      )}
+                      
+                      {transaction.items && transaction.items.length > 0 && (
+                        <div className={`p-2 rounded-xl border ${isDarkMode ? 'bg-slate-950/50 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                          <div className="space-y-1">
+                            {transaction.items.map((item, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-[8px] font-bold uppercase tracking-tight">
+                                <span className={isDarkMode ? 'text-slate-400' : 'text-slate-500'}>{item.description}</span>
+                                <span className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>R$ {item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 }
@@ -651,6 +687,7 @@ export default function FinancialView({
           people={people}
           initialType={modalInitialType}
           transaction={editingTransaction}
+          isDarkMode={isDarkMode}
         />
 
       <FinancialQueryModal

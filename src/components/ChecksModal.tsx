@@ -1,6 +1,7 @@
 import React from 'react';
-import { Purchase, Person, CompanyCheck } from '../types';
-import { X, Clipboard, Copy, Landmark, Calendar, DollarSign, Hash, User, AlertCircle, FileDown, CheckCircle2, RefreshCcw } from 'lucide-react';
+import { Purchase, Person } from '../types';
+import { X, Calendar, User, Hash, CheckCircle2, AlertCircle, Clipboard, Copy, Share2, RefreshCcw } from 'lucide-react';
+import { sharePDF } from '../utils/pdfShare';
 import { format } from 'date-fns';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -85,7 +86,7 @@ export default function ChecksModal({
       styles: { fontSize: 10, cellPadding: 5 }
     });
 
-    doc.save(`cheques_compra_${purchase.id.slice(-6)}.pdf`);
+    sharePDF(doc, `cheques_compra_${purchase.id.slice(-6)}.pdf`);
   };
 
   const handleClearCheque = (chequeId: string) => {
@@ -132,10 +133,10 @@ export default function ChecksModal({
               </button>
               <button 
                 onClick={downloadPDF}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 text-[8px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all border border-indigo-100 dark:border-indigo-900/50"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 text-[8px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all border border-indigo-100 dark:border-indigo-900/50 active:scale-95"
               >
-                <FileDown size={14} />
-                PDF
+                <Share2 size={14} />
+                Exportar PDF
               </button>
             </div>
           </div>

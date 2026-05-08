@@ -132,7 +132,7 @@ export default function PeopleView({ people, sales, purchases, transactions, onA
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <h3 className={`font-bold text-sm tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{person.name}</h3>
+                  <h3 className={`font-black text-sm tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>{person.name}</h3>
                   <div className="flex gap-1">
                     {person.isCustomer && <ShieldCheck size={14} className="text-emerald-500" />}
                     {person.isSupplier && <Truck size={14} className="text-amber-500" />}

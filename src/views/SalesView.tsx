@@ -1,8 +1,11 @@
 import { useState, useMemo } from 'react';
 import { Sale, SaleType, PaymentStatus, Product, Grid, SaleStatus, Person, PaymentMethod, Account, PaymentTerm } from '../types';
-import { ShoppingBag, TrendingUp, User, Calendar, Tag, Filter, Plus, Hash, Clock, CheckCircle2, AlertCircle, MoreVertical, Edit2, Trash2, X, Info, Box, Ban, RotateCcw, Search, MessageSquare, Copy, Share, DollarSign, History, FileText } from 'lucide-react';
+import { ShoppingBag, TrendingUp, User, Calendar, Tag, Filter, Plus, Hash, Clock, CheckCircle2, AlertCircle, MoreVertical, Edit2, Trash2, X, Info, Box, Ban, RotateCcw, Search, MessageSquare, Copy, Share, DollarSign, History, FileText, Lightbulb, FileImage } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { sharePDF, shareImage } from '../utils/pdfShare';
 import SalePaymentModal from '../components/SalePaymentModal';
 
 interface SalesViewProps {
@@ -44,6 +47,7 @@ export default function SalesView({
 }: SalesViewProps) {
   const [filter, setFilter] = useState<'ALL' | 'RETAIL' | 'WHOLESALE'>('ALL');
   const [paymentFilter, setPaymentFilter] = useState<'ALL' | 'PENDING' | 'PAID'>('ALL');
+  const [yearFilter, setYearFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [selectedStatuses, setSelectedStatuses] = useState<SaleStatus[]>([SaleStatus.SALE, SaleStatus.QUOTE]);
   const [showFilters, setShowFilters] = useState(false);
@@ -61,6 +65,12 @@ export default function SalesView({
     products.forEach(p => map.set(p.id, p));
     return map;
   }, [products]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    sales.forEach(s => years.add(new Date(s.date).getFullYear()));
+    return Array.from(years).sort((a, b) => b - a);
+  }, [sales]);
 
   const filteredSales = useMemo(() => {
     return sales.filter(s => {
@@ -89,9 +99,14 @@ export default function SalesView({
         if (!matchesName && !matchesId) return false;
       }
 
+      // Filter by Year
+      if (yearFilter !== 'ALL') {
+        if (new Date(s.date).getFullYear().toString() !== yearFilter) return false;
+      }
+
       return true;
     }).sort((a, b) => b.date - a.date); // Mais recentes primeiro
-  }, [sales, filter, paymentFilter, selectedStatuses, searchQuery]);
+  }, [sales, filter, paymentFilter, selectedStatuses, searchQuery, yearFilter]);
 
   const getProductInfo = (productId: string) => productMap.get(productId);
 
@@ -146,26 +161,253 @@ export default function SalesView({
     if (customMessage) setEditingMessage(null);
   };
 
-  return (
-    <div className="flex flex-col gap-6 h-full pb-44 px-1 overflow-y-auto force-scrollbar">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl">
-            <ShoppingBag className="text-emerald-600 dark:text-emerald-400" size={24} strokeWidth={2.5} />
-          </div>
-          <h2 className={`text-xl font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-            Loja Virtual & Vendas
-          </h2>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <button className={`p-2.5 rounded-xl transition-all ${isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-50 text-slate-400'}`}>
-            <History size={20} />
-          </button>
-        </div>
-      </div>
+  const handleExportPDF = async (sale: Sale) => {
+    try {
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.width;
+      const margin = 20;
 
+      // Cores do Tema (Premium Dark)
+      const primaryColor = [15, 23, 42]; // slate-900
+      const accentColor = [79, 70, 229]; // indigo-600
+      const textColor = [51, 65, 85];    // slate-700
+      const lightTextColor = [148, 163, 184]; // slate-400
+
+      // 1. Header Design (Modern Gradient-like)
+      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.rect(0, 0, pageWidth, 45, 'F');
+      
+      // Accent line
+      doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.rect(0, 45, pageWidth, 2, 'F');
+
+      // Título do Sistema
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(22);
+      doc.text('SISTEMA DE VENDAS', margin, 25);
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(200, 200, 200);
+      doc.text(sale.status === SaleStatus.QUOTE ? 'ORÇAMENTO' : 'VENDA CONFIRMADA', margin, 32);
+
+      // Aviso de Valor Fiscal
+      doc.setFontSize(7);
+      doc.setTextColor(255, 100, 100);
+      doc.text('ESTE DOCUMENTO NÃO TEM VALOR FISCAL', margin, 38);
+
+      // Número do Pedido no Canto Superior Direito
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`#${sale.orderNumber}`, pageWidth - margin, 28, { align: 'right' });
+
+      // 2. Info Section (Customer & Date)
+      const startY = 65;
+      
+      // Card Background for Info
+      doc.setFillColor(248, 250, 252); // slate-50
+      doc.roundedRect(margin, startY, pageWidth - (margin * 2), 25, 2, 2, 'F');
+
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DADOS DO CLIENTE', margin + 5, startY + 8);
+      
+      doc.setFontSize(11);
+      doc.text(sale.customerName || 'Consumidor Final', margin + 5, startY + 18);
+
+      doc.setFontSize(8);
+      doc.text('DATA DE EMISSÃO', pageWidth - margin - 35, startY + 8);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text(format(sale.date, 'dd/MM/yyyy', { locale: ptBR }), pageWidth - margin - 35, startY + 18);
+
+      // 3. Items Table
+      const tableData = sale.items.map(item => {
+        const product = products.find(p => p.id === item.productId);
+        const variation = product?.variations.find(v => v.id === item.variationId);
+        
+        let desc = product?.name || 'Produto';
+        if (variation?.colorName) desc += ` - ${variation.colorName}`;
+        if (item.size) desc += ` (Tam: ${item.size})`;
+
+        return [
+          desc,
+          item.quantity,
+          `R$ ${item.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          `R$ ${(item.quantity * item.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        ];
+      });
+
+      autoTable(doc, {
+        startY: startY + 35,
+        head: [['PRODUTO / DESCRIÇÃO', 'QTD', 'UNITÁRIO', 'TOTAL']],
+        body: tableData,
+        theme: 'plain',
+        headStyles: {
+          fillColor: [241, 245, 249],
+          textColor: primaryColor as any,
+          fontSize: 9,
+          fontStyle: 'bold',
+          halign: 'left',
+          cellPadding: 4
+        },
+        bodyStyles: {
+          fontSize: 9,
+          textColor: textColor as any,
+          cellPadding: 4
+        },
+        columnStyles: {
+          1: { halign: 'center', cellWidth: 20 },
+          2: { halign: 'right', cellWidth: 35 },
+          3: { halign: 'right', cellWidth: 35 }
+        },
+        margin: { left: margin, right: margin }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY + 10;
+
+      // 4. Totals Summary
+      const summaryX = pageWidth - margin - 60;
+      
+      doc.setFontSize(9);
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+      doc.text('Subtotal:', summaryX, finalY);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text(`R$ ${sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin, finalY, { align: 'right' });
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.text('TOTAL GERAL:', summaryX, finalY + 10);
+      doc.text(`R$ ${sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin, finalY + 10, { align: 'right' });
+
+      // 5. Notes / Footer
+      if (sale.notes) {
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text('OBSERVAÇÕES:', margin, finalY + 25);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+        doc.text(sale.notes, margin, finalY + 32, { maxWidth: pageWidth - (margin * 2) });
+      }
+
+      // Footer Banner
+      const footerY = 285;
+      doc.setFillColor(241, 245, 249);
+      doc.rect(0, footerY - 5, pageWidth, 15, 'F');
+      doc.setFontSize(7);
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+      doc.text('Este documento foi gerado eletronicamente através do Sistema de Vendas.', pageWidth / 2, footerY + 2, { align: 'center' });
+
+      const fileName = `${sale.status === SaleStatus.QUOTE ? 'Orcamento' : 'Pedido'}_${sale.orderNumber}.pdf`;
+      await sharePDF(doc, fileName);
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      alert('Erro ao gerar PDF da venda.');
+    }
+  };
+
+  const handleExportJPG = async (sale: Sale) => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      canvas.width = 1200;
+      canvas.height = 1800;
+
+      // Background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Header
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, canvas.width, 250);
+      ctx.fillStyle = '#4f46e5';
+      ctx.fillRect(0, 250, canvas.width, 10);
+
+      // Title
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 70px Helvetica';
+      ctx.fillText('SISTEMA DE VENDAS', 80, 120);
+      
+      ctx.font = '35px Helvetica';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(sale.status === SaleStatus.QUOTE ? 'ORÇAMENTO' : 'VENDA CONFIRMADA', 80, 180);
+
+      // Sem valor fiscal
+      ctx.fillStyle = '#fecaca';
+      ctx.font = 'bold 22px Helvetica';
+      ctx.fillText('ESTE DOCUMENTO NÃO TEM VALOR FISCAL', 80, 220);
+
+      // Info Section
+      ctx.fillStyle = '#f8fafc';
+      ctx.roundRect ? (ctx as any).roundRect(80, 290, canvas.width - 160, 160, 20) : ctx.rect(80, 290, canvas.width - 160, 160);
+      ctx.fill();
+
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 25px Helvetica';
+      ctx.fillText('CLIENTE', 120, 350);
+      ctx.font = '45px Helvetica';
+      ctx.fillText(sale.customerName || 'Consumidor Final', 120, 415);
+
+      ctx.textAlign = 'right';
+      ctx.font = 'bold 25px Helvetica';
+      ctx.fillText('DATA', canvas.width - 120, 350);
+      ctx.font = '45px Helvetica';
+      ctx.fillText(format(sale.date, 'dd/MM/yyyy'), canvas.width - 120, 415);
+
+      // Table Header
+      let currentY = 550;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#f1f5f9';
+      ctx.fillRect(80, currentY, canvas.width - 160, 70);
+      ctx.fillStyle = '#475569';
+      ctx.font = 'bold 30px Helvetica';
+      ctx.fillText('PRODUTO / DESCRIÇÃO', 120, currentY + 45);
+      ctx.textAlign = 'right';
+      ctx.fillText('TOTAL', canvas.width - 120, currentY + 45);
+
+      // Items
+      currentY += 120;
+      ctx.textAlign = 'left';
+      ctx.font = '32px Helvetica';
+      ctx.fillStyle = '#334155';
+
+      sale.items.forEach(item => {
+        const product = products.find(p => p.id === item.productId);
+        const variation = product?.variations.find(v => v.id === item.variationId);
+        let desc = `${item.quantity}x ${product?.name || 'Item'}`;
+        if (variation?.colorName) desc += ` - ${variation.colorName}`;
+        if (item.size) desc += ` (${item.size})`;
+
+        ctx.fillText(desc, 120, currentY);
+        ctx.textAlign = 'right';
+        ctx.fillText(`R$ ${(item.quantity * item.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 120, currentY);
+        ctx.textAlign = 'left';
+        currentY += 70;
+      });
+
+      // Total
+      currentY += 60;
+      ctx.fillStyle = '#4f46e5';
+      ctx.font = 'bold 60px Helvetica';
+      ctx.textAlign = 'right';
+      ctx.fillText(`TOTAL: R$ ${sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 80, currentY);
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      const fileName = `${sale.status === SaleStatus.QUOTE ? 'Orcamento' : 'Venda'}_${sale.orderNumber}.jpg`;
+      await shareImage(dataUrl, fileName);
+    } catch (error) {
+      console.error('Erro ao gerar JPG:', error);
+      alert('Erro ao gerar imagem da venda.');
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-6 h-full pb-44 px-1 overflow-y-auto force-scrollbar pt-4">
       <div className="flex flex-col gap-6">
         <div className="flex items-center justify-between">
           <div>
@@ -179,33 +421,75 @@ export default function SalesView({
                 onClick={() => setShowFilters(!showFilters)}
                 className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${showFilters ? 'bg-indigo-600 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}
               >
-                <Filter size={18} strokeWidth={2.5} />
+                <Filter size={18} strokeWidth={2.5} className={!showFilters ? "animate-pulse-blue" : ""} />
               </button>
-
-              <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
-                {(['RETAIL', 'WHOLESALE'] as const).map(f => (
-                  <button 
-                    key={f}
-                    onClick={() => setFilter(filter === f ? 'ALL' : f)}
-                    className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${filter === f ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
-                  >
-                    {f === 'RETAIL' ? <Box size={12} /> : <TrendingUp size={12} />}
-                    {f === 'RETAIL' ? 'Varejo' : 'Atacado'}
-                  </button>
-                ))}
-              </div>
             </div>
 
-            <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
-              {(['ALL', 'PENDING', 'PAID'] as const).map(f => (
-                <button 
-                  key={f}
-                  onClick={() => setPaymentFilter(f)}
-                  className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${paymentFilter === f ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
-                >
-                  {f === 'ALL' ? 'Todos' : f === 'PENDING' ? 'Pendente' : 'Concluído'}
-                </button>
-              ))}
+            <div className={`flex flex-col gap-2 transition-all duration-300 ${showFilters ? 'h-auto opacity-100' : 'h-0 opacity-0 overflow-hidden'}`}>
+              <div className="flex items-center gap-2">
+                <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
+                  {([SaleStatus.SALE, SaleStatus.QUOTE] as const).map(s => (
+                    <button 
+                      key={s}
+                      onClick={() => {
+                        setSelectedStatuses(prev => 
+                          prev.includes(s) 
+                            ? (prev.length > 1 ? prev.filter(x => x !== s) : prev) 
+                            : [...prev, s]
+                        );
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${selectedStatuses.includes(s) ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
+                    >
+                      {s === SaleStatus.SALE ? 'Vendas' : 'Orçamentos'}
+                    </button>
+                  ))}
+                </div>
+
+                <div className={`flex p-1 rounded-xl overflow-x-auto force-scrollbar max-w-[200px] ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
+                  <button 
+                    onClick={() => setYearFilter('ALL')}
+                    className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${yearFilter === 'ALL' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
+                  >
+                    Anos: Todos
+                  </button>
+                  {availableYears.map(year => (
+                    <button 
+                      key={year}
+                      onClick={() => setYearFilter(year.toString())}
+                      className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${yearFilter === year.toString() ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
+                    >
+                      {year}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
+                  {(['RETAIL', 'WHOLESALE'] as const).map(f => (
+                    <button 
+                      key={f}
+                      onClick={() => setFilter(filter === f ? 'ALL' : f)}
+                      className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${filter === f ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
+                    >
+                      {f === 'RETAIL' ? <Box size={12} /> : <TrendingUp size={12} />}
+                      {f === 'RETAIL' ? 'Varejo' : 'Atacado'}
+                    </button>
+                  ))}
+                </div>
+
+                <div className={`flex p-1 rounded-xl ${isDarkMode ? 'bg-slate-900' : 'bg-slate-100'}`}>
+                  {(['ALL', 'PENDING', 'PAID'] as const).map(f => (
+                    <button 
+                      key={f}
+                      onClick={() => setPaymentFilter(f)}
+                      className={`px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${paymentFilter === f ? 'bg-slate-900 dark:bg-indigo-600 text-white shadow-md' : 'text-slate-400'}`}
+                    >
+                      {f === 'ALL' ? 'Pag: Todos' : f === 'PENDING' ? 'Pendente' : 'Pago'}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -245,8 +529,8 @@ export default function SalesView({
                         {customer?.name || sale.customerName || 'Cliente'}
                       </h3>
                       <div className="flex gap-1">
-                        <span className="px-2 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[8px] font-black uppercase tracking-widest">
-                          VENDA
+                        <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest ${sale.status === SaleStatus.QUOTE ? 'bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'}`}>
+                          {sale.status === SaleStatus.QUOTE ? 'ORÇAMENTO' : 'VENDA'}
                         </span>
                         {status === 'PAID' ? (
                           <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[8px] font-black uppercase tracking-widest">
@@ -266,9 +550,16 @@ export default function SalesView({
                         )}
                       </div>
                     </div>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
-                      #{sale.orderNumber} • {format(sale.date, "dd/MM/yyyy", { locale: ptBR })}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {sale.sellerName && (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[8px] font-black uppercase tracking-widest">
+                          {sale.sellerName}
+                        </span>
+                      )}
+                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
+                        #{sale.orderNumber} • {format(sale.date, "dd/MM/yyyy", { locale: ptBR })}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -321,13 +612,34 @@ export default function SalesView({
                 )}
               </div>
 
-              <div className="flex justify-end pt-3 border-t border-slate-50 dark:border-slate-800">
+              <div className="flex justify-between items-center pt-3 border-t border-slate-50 dark:border-slate-800">
+                <div>
+                  {sale.notes && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNoteModal({ isOpen: true, note: sale.notes || '' });
+                      }}
+                      className="p-2 bg-yellow-50 dark:bg-yellow-500/10 rounded-xl text-yellow-500 animate-pulse-alert flex items-center justify-center active:scale-95 transition-all"
+                      title="Ver Observações"
+                      aria-label="Ver observações desta venda"
+                    >
+                      <Lightbulb size={16} strokeWidth={2.5} />
+                    </button>
+                  )}
+                </div>
                 <div className={`flex items-center gap-1.5 p-1.5 rounded-2xl ${isDarkMode ? 'bg-slate-800/80' : 'bg-slate-50 shadow-inner'}`}>
                   <button 
-                    onClick={() => handleCopyMessage(sale)}
-                    className="p-2 rounded-xl text-indigo-500 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-all active:scale-95"
+                    onClick={() => handleExportPDF(sale)}
+                    className="flex items-center justify-center w-9 h-9 rounded-xl text-rose-600 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all active:scale-95 border border-rose-100 dark:border-rose-500/20 text-[9px] font-black"
                   >
-                    <Copy size={16} strokeWidth={2.5} />
+                    PDF
+                  </button>
+                  <button 
+                    onClick={() => handleExportJPG(sale)}
+                    className="flex items-center justify-center w-9 h-9 rounded-xl text-blue-600 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-all active:scale-95 border border-blue-100 dark:border-blue-500/20 text-[9px] font-black"
+                  >
+                    JPG
                   </button>
                   <button 
                     onClick={() => handleShareWhatsApp(sale)}
@@ -380,16 +692,29 @@ export default function SalesView({
                         </button>
                       )}
                       
+                      {sale.status === SaleStatus.SALE && (
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPaymentModalMode('PAYMENT');
+                            setPaymentModalSale(sale);
+                            setShowOptionsId(null);
+                          }}
+                          className="w-full flex items-center gap-2.5 p-3 text-left text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition-all"
+                        >
+                          <DollarSign size={14} /> Registrar Recebimento
+                        </button>
+                      )}
+
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
-                          setPaymentModalMode('PAYMENT');
-                          setPaymentModalSale(sale);
+                          handleExportPDF(sale);
                           setShowOptionsId(null);
                         }}
-                        className="w-full flex items-center gap-2.5 p-3 text-left text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition-all"
+                        className="w-full flex items-center gap-2.5 p-3 text-left text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all"
                       >
-                        <DollarSign size={14} /> Registrar Recebimento
+                        <FileText size={14} /> Exportar PDF
                       </button>
 
                       <button 

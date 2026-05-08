@@ -183,6 +183,7 @@ export enum TransactionType {
 
 export type Transaction = {
   id: string;
+  transactionNumber?: string;
   type: TransactionType;
   categoryId: string;
   accountId: string;
@@ -195,6 +196,7 @@ export type Transaction = {
   relatedId?: string;
   memberId?: string; // For Family Members in personal finance
   isPersonal?: boolean;
+  items?: GeneralPurchaseItem[];
 };
 
 export enum CategoryType {
@@ -237,6 +239,7 @@ export type Account = {
   balance: number;
   color: string;
   type: AccountType;
+  isDefault?: boolean;
 };
 
 export enum ViewType {

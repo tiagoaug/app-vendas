@@ -7,13 +7,16 @@ import {
   Calendar,
   History,
   Trash2,
-  Edit2, // Added
+  Edit2,
   MessageSquare,
-  X, // Added
+  X,
   Search,
   Filter,
   Clipboard,
   Hash,
+  Lightbulb,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { format, isSameMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -23,6 +26,7 @@ import ChecksModal from "../components/ChecksModal";
 interface PurchasesViewProps {
   purchases: Purchase[];
   suppliers: Person[];
+  products: Product[];
   onAdd: () => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
@@ -34,6 +38,7 @@ interface PurchasesViewProps {
 export default function PurchasesView({
   purchases,
   suppliers,
+  products,
   onAdd,
   onEdit,
   onDelete,
@@ -234,16 +239,25 @@ export default function PurchasesView({
                     )}
                   </div>
                   <div>
-                    <h3
-                      className={`font-extrabold text-[13px] tracking-tight leading-none uppercase ${isDarkMode ? "text-white" : "text-slate-800"}`}
-                    >
-                      {supplier?.name || "Fornecedor"}
-                    </h3>
-                    <div className="flex flex-col gap-1.5 mt-1.5">
-                      <div className="flex items-center gap-1.5 text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">
-                        <Calendar size={12} strokeWidth={3} />
-                        {format(purchase.date, "dd MMM yyyy", { locale: ptBR })}
+                    <div>
+                      <h3
+                        className={`font-extrabold text-[13px] tracking-tight leading-none uppercase ${isDarkMode ? "text-white" : "text-slate-800"}`}
+                      >
+                        {supplier?.name || "Fornecedor"}
+                      </h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        {purchase.sellerName && (
+                          <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[8px] font-black uppercase tracking-widest">
+                            {purchase.sellerName}
+                          </span>
+                        )}
+                        <div className="flex items-center gap-1.5 text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">
+                          <Calendar size={12} strokeWidth={3} />
+                          {format(purchase.date, "dd MMM yyyy", { locale: ptBR })}
+                        </div>
                       </div>
+                    </div>
+                    <div className="flex flex-col gap-1.5 mt-1.5">
                       <div className="flex items-center gap-1.5 text-[9px] text-indigo-500 dark:text-indigo-400 font-black uppercase tracking-widest">
                         <Hash size={12} strokeWidth={3} />
                         #{purchase.batchNumber || purchase.id.slice(-6).toUpperCase()}
@@ -292,6 +306,34 @@ export default function PurchasesView({
                 </div>
               </div>
 
+              {/* Items List */}
+              {itemCount > 0 && (
+                <div className="px-5 pb-2">
+                  <div className={`p-3 rounded-2xl border ${isDarkMode ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-100'}`}>
+                    <div className="space-y-1.5">
+                      {purchase.type === PurchaseType.GENERAL && purchase.generalItems?.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-[9px] font-bold uppercase tracking-tight">
+                          <span className={isDarkMode ? 'text-slate-400' : 'text-slate-500'}>{item.description}</span>
+                          <span className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>R$ {item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                        </div>
+                      ))}
+                      {purchase.type === PurchaseType.REPLENISHMENT && purchase.items?.map((item, idx) => {
+                        const product = products.find(p => p.id === item.productId);
+                        const variation = product?.variations.find(v => v.id === item.variationId);
+                        return (
+                          <div key={idx} className="flex justify-between items-center text-[9px] font-bold uppercase tracking-tight">
+                            <span className={isDarkMode ? 'text-slate-400' : 'text-slate-500'}>
+                              {item.quantity}x {product?.name || 'Produto'}
+                            </span>
+                            <span className={isDarkMode ? 'text-slate-200' : 'text-slate-700'}>R$ {(item.cost * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Checks Button (More visible highlight) */}
               {purchase.checks && purchase.checks.length > 0 && (
                 <div className="px-4 pb-2">
@@ -315,9 +357,6 @@ export default function PurchasesView({
 
               <div className="pt-4 border-t border-slate-50 dark:border-slate-800 flex items-center justify-between z-10">
                 <div className="flex items-center gap-3">
-                  <div className="flex -space-x-2">
-                    {/* Items are no longer displayed as dots */}
-                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -348,11 +387,11 @@ export default function PurchasesView({
                         e.stopPropagation();
                         setSelectedNote(purchase.notes || null);
                       }}
-                      className="p-2 text-amber-500 dark:text-amber-400 active:scale-90"
+                      className="p-2 text-yellow-500 animate-pulse-alert active:scale-90"
                       title="Ver Observações"
                       aria-label="Ver observações desta compra"
                     >
-                      <MessageSquare size={18} strokeWidth={2.5} />
+                      <Lightbulb size={20} strokeWidth={2.5} />
                     </button>
                   )}
                 </div>

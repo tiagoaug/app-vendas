@@ -21,14 +21,14 @@ export default function TransactionSettleModal({
   isDarkMode
 }: TransactionSettleModalProps) {
   const [amount, setAmount] = useState<number | string>(transaction.amount);
-  const [accountId, setAccountId] = useState(transaction.accountId || (accounts[0]?.id || ''));
+  const [accountId, setAccountId] = useState(transaction.accountId || (accounts.find(a => a.isDefault)?.id || accounts[0]?.id || ''));
   const [note, setNote] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       setAmount(transaction.amount);
-      setAccountId(transaction.accountId || (accounts[0]?.id || ''));
+      setAccountId(transaction.accountId || (accounts.find(a => a.isDefault)?.id || accounts[0]?.id || ''));
       setNote('');
     }
   }, [isOpen, transaction, accounts]);
