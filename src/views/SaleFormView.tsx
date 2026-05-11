@@ -3,9 +3,10 @@ import { Sale, Product, SaleType, SaleItem, SalePayment, Grid, Person, PaymentMe
 import { firebaseService } from '../services/firebaseService';
 import ComboBox from '../components/ComboBox';
 import { Receipt, Plus, Minus, Package, ChevronDown, ChevronUp, Trash2, Box, Info, X, Send, FileText, Download, CheckCircle2, ShoppingCart, Calendar, Clock, CreditCard, Wallet, Share2, Share, TrendingUp, MessageSquare, Percent, Ban, RotateCcw, Save, Search, Copy, DollarSign } from 'lucide-react';
-import { sharePDF } from '../utils/pdfShare';
+import { sharePDF, shareImage } from '../utils/pdfShare';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import ExportNoteModal from '../components/ExportNoteModal';
 
 interface SaleBlock {
   id: string;
@@ -105,6 +106,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
   const [isMessageManual, setIsMessageManual] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [exportModal, setExportModal] = useState<{ isOpen: boolean, type: 'PDF' | 'JPG' }>({ isOpen: false, type: 'PDF' });
 
   // Effect to initialize from saleId when data is available
   useEffect(() => {
@@ -440,7 +442,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
     setShowWhatsAppModal(false);
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async (observation?: string) => {
     const customer = people.find(p => p.id === customerId);
     const items = getItems();
 
@@ -449,134 +451,303 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
       return;
     }
 
-    const doc = new jsPDF();
-    const statusText = status === SaleStatus.QUOTE ? 'ORÇAMENTO' : 'PEDIDO';
+    try {
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.width;
+      const margin = 20;
 
-    // Header Decor
-    doc.setFillColor(15, 23, 42); // slate-900
-    doc.rect(0, 0, 210, 45, 'F');
+      // Cores do Tema (Premium Dark)
+      const primaryColor = [15, 23, 42]; // slate-900
+      const accentColor = [79, 70, 229]; // indigo-600
+      const textColor = [51, 65, 85];    // slate-700
+      const lightTextColor = [148, 163, 184]; // slate-400
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(24);
-    doc.text('CALÇADOS', 20, 25);
+      // 1. Header Design
+      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.rect(0, 0, pageWidth, 45, 'F');
+      
+      doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.rect(0, 45, pageWidth, 2, 'F');
 
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(148, 163, 184); // slate-400
-    doc.text(`REGISTRO DE ${statusText}`, 20, 32);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(22);
+      doc.text('SISTEMA DE VENDAS', margin, 25);
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(12);
-    doc.text(`#${orderNumber}`, 190, 28, { align: 'right' });
-
-    // Customer Section
-    doc.setTextColor(15, 23, 42);
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'bold');
-    doc.text('DADOS DO DOCUMENTO', 20, 60);
-    doc.setDrawColor(226, 232, 240);
-    doc.line(20, 62, 190, 62);
-
-    doc.setFontSize(11);
-    doc.text(customer?.name || 'CONSUMIDOR - VENDA AVULSA', 20, 72);
-
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 116, 139);
-    doc.text(`Tel: ${customer?.phone || '---'}`, 20, 78);
-    doc.text(`Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 190, 72, { align: 'right' });
-
-    // Table
-    const tableData = items.map(item => {
-      const p = products.find(prod => prod.id === item.productId);
-      const v = p?.variations.find(varItem => varItem.id === item.variationId);
-      const variantDesc = v?.colorName ? ` (${v.colorName})` : '';
-      const sizeDesc = item.size ? ` / TAM ${item.size}` : '';
-
-      return [
-        { content: `${p?.name}${variantDesc}${sizeDesc}`, styles: { fontStyle: 'bold' } },
-        item.quantity,
-        `R$ ${item.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        `R$ ${(item.price * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      ];
-    });
-
-    autoTable(doc, {
-      startY: 90,
-      head: [['PRODUTO / COMPOSIÇÃO', 'QTD', 'VALOR UN.', 'VALOR TOTAL']],
-      body: tableData as any,
-      theme: 'grid',
-      headStyles: {
-        fillColor: [15, 23, 42],
-        textColor: [255, 255, 255],
-        fontSize: 8,
-        fontStyle: 'bold',
-        halign: 'center'
-      },
-      styles: {
-        fontSize: 9,
-        cellPadding: 5,
-        lineColor: [241, 245, 249]
-      },
-      columnStyles: {
-        1: { halign: 'center' },
-        2: { halign: 'right' },
-        3: { halign: 'right' }
-      }
-    });
-
-    // Summary
-    const finalY = (doc as any).lastAutoTable.finalY + 15;
-
-    // Payment Card
-    doc.setFillColor(248, 250, 252); // slate-50
-    doc.roundedRect(20, finalY, 80, 40, 3, 3, 'F');
-
-    doc.setTextColor(71, 85, 105);
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'bold');
-    doc.text('FORMA DE PAGAMENTO SELECIONADA', 25, finalY + 10);
-
-    const paymentMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
-    doc.setTextColor(15, 23, 42);
-    doc.setFontSize(10);
-    doc.text(paymentMethod?.name || 'A DEFINIR', 25, finalY + 20);
-
-    if (paymentMethod?.value) {
-      doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
+      doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.text(paymentMethod.value, 25, finalY + 30, { maxWidth: 70 });
+      doc.setTextColor(200, 200, 200);
+      doc.text(status === SaleStatus.QUOTE ? 'ORÇAMENTO' : 'VENDA CONFIRMADA', margin, 32);
+
+      doc.setFontSize(7);
+      doc.setTextColor(255, 100, 100);
+      doc.text('ESTE DOCUMENTO NÃO TEM VALOR FISCAL', margin, 38);
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`#${orderNumber}`, pageWidth - margin, 28, { align: 'right' });
+
+      // 2. Info Section
+      const startY = 65;
+      doc.setFillColor(248, 250, 252);
+      doc.roundedRect(margin, startY, pageWidth - (margin * 2), 25, 2, 2, 'F');
+
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DADOS DO CLIENTE', margin + 5, startY + 8);
+      
+      doc.setFontSize(11);
+      doc.text(customer?.name || 'Consumidor Final', margin + 5, startY + 18);
+
+      doc.setFontSize(8);
+      doc.text('DATA DE EMISSÃO', pageWidth - margin - 35, startY + 8);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text(new Date().toLocaleDateString('pt-BR'), pageWidth - margin - 35, startY + 18);
+
+      // 3. Items Table
+      const tableData = items.map(item => {
+        const p = products.find(prod => prod.id === item.productId);
+        const v = p?.variations.find(varItem => varItem.id === item.variationId);
+        let desc = p?.name || 'Produto';
+        if (v?.colorName) desc += ` - ${v.colorName}`;
+        if (item.size) desc += ` (Tam: ${item.size})`;
+
+        return [
+          desc,
+          item.quantity,
+          `R$ ${item.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          `R$ ${(item.quantity * item.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        ];
+      });
+
+      autoTable(doc, {
+        startY: startY + 35,
+        head: [['PRODUTO / DESCRIÇÃO', 'QTD', 'UNITÁRIO', 'TOTAL']],
+        body: tableData,
+        theme: 'plain',
+        headStyles: {
+          fillColor: [241, 245, 249],
+          textColor: primaryColor as any,
+          fontSize: 9,
+          fontStyle: 'bold',
+          halign: 'left',
+          cellPadding: 4
+        },
+        bodyStyles: {
+          fontSize: 9,
+          textColor: textColor as any,
+          cellPadding: 4
+        },
+        columnStyles: {
+          1: { halign: 'center', cellWidth: 20 },
+          2: { halign: 'right', cellWidth: 35 },
+          3: { halign: 'right', cellWidth: 35 }
+        },
+        margin: { left: margin, right: margin }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY + 10;
+
+      // 4. Totals Summary
+      const summaryX = pageWidth - margin - 60;
+      
+      doc.setFontSize(9);
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+      doc.text('Valor da Compra:', summaryX, finalY);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text(`R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin, finalY, { align: 'right' });
+
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+      doc.text('Valor de Desconto:', summaryX, finalY + 8);
+      doc.setTextColor(225, 29, 72); // rose-600
+      const discountTextValue = discountType === 'percentage' ? `${discount}%` : `R$ ${discount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      doc.text(`- ${discountTextValue}`, pageWidth - margin, finalY + 8, { align: 'right' });
+
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.text('VALOR TOTAL:', summaryX, finalY + 18);
+      doc.text(`R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin, finalY + 18, { align: 'right' });
+
+      // 5. Notes / Observation
+      let noteY = finalY + 35;
+      
+      if (observation) {
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text('OBSERVAÇÃO DO DOCUMENTO:', margin, noteY);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+        doc.text(observation, margin, noteY + 7, { maxWidth: pageWidth - (margin * 2) });
+        noteY += 25;
+      }
+
+      if (notes) {
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text('NOTAS DO PEDIDO:', margin, noteY);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+        doc.text(notes, margin, noteY + 7, { maxWidth: pageWidth - (margin * 2) });
+      }
+
+      // Footer Banner
+      const footerY = 285;
+      doc.setFillColor(241, 245, 249);
+      doc.rect(0, footerY - 5, pageWidth, 15, 'F');
+      doc.setFontSize(7);
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+      doc.text('Este documento foi gerado eletronicamente através do Sistema de Vendas.', pageWidth / 2, footerY + 2, { align: 'center' });
+
+      const fileName = `${status === SaleStatus.QUOTE ? 'Orcamento' : 'Pedido'}_${orderNumber}.pdf`;
+      await sharePDF(doc, fileName);
+      setExportModal({ ...exportModal, isOpen: false });
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      alert('Erro ao gerar PDF da venda.');
     }
+  };
 
-    // Totals Sidebar
-    doc.setTextColor(100, 116, 139);
-    doc.setFontSize(9);
-    doc.text('Subtotal Bruto:', 150, finalY + 10, { align: 'right' });
-    doc.text('Desconto Aplicado:', 150, finalY + 18, { align: 'right' });
+  const handleExportJPG = async (observation?: string) => {
+    try {
+      const items = getItems();
+      const customer = people.find(p => p.id === customerId);
 
-    doc.setTextColor(15, 23, 42);
-    doc.text(`R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 190, finalY + 10, { align: 'right' });
-    doc.setTextColor(225, 29, 72);
-    const discountFormatted = discountType === 'percentage' ? `${discount}%` : `R$ ${discount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    doc.text(`- ${discountFormatted}`, 190, finalY + 18, { align: 'right' });
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      canvas.width = 1200;
+      canvas.height = 1800;
 
-    doc.setFillColor(15, 23, 42);
-    doc.rect(130, finalY + 25, 60, 12, 'F');
+      // Background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text('VALOR FINAL', 135, finalY + 33);
-    doc.text(`R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 185, finalY + 33, { align: 'right' });
+      // Header
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, canvas.width, 250);
+      ctx.fillStyle = '#4f46e5';
+      ctx.fillRect(0, 250, canvas.width, 10);
 
-    // Legal
-    doc.setTextColor(148, 163, 184);
-    doc.setFontSize(7);
-    doc.text('Documento gerado para fins informativos e conferência.', 105, 285, { align: 'center' });
+      // Title
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 70px Helvetica';
+      ctx.fillText('SISTEMA DE VENDAS', 80, 120);
+      
+      ctx.font = '35px Helvetica';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(status === SaleStatus.QUOTE ? 'ORÇAMENTO' : 'VENDA CONFIRMADA', 80, 180);
 
-    sharePDF(doc, `${statusText}_#${orderNumber}_${customer?.name || 'Venda'}.pdf`);
+      // Sem valor fiscal
+      ctx.fillStyle = '#fecaca';
+      ctx.font = 'bold 22px Helvetica';
+      ctx.fillText('ESTE DOCUMENTO NÃO TEM VALOR FISCAL', 80, 220);
+
+      // Info Section
+      ctx.fillStyle = '#f8fafc';
+      ctx.roundRect ? (ctx as any).roundRect(80, 290, canvas.width - 160, 160, 20) : ctx.rect(80, 290, canvas.width - 160, 160);
+      ctx.fill();
+
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 25px Helvetica';
+      ctx.fillText('CLIENTE', 120, 350);
+      ctx.font = '45px Helvetica';
+      ctx.fillText(customer?.name || 'Consumidor Final', 120, 415);
+
+      ctx.textAlign = 'right';
+      ctx.font = 'bold 25px Helvetica';
+      ctx.fillText('DATA', canvas.width - 120, 350);
+      ctx.font = '45px Helvetica';
+      ctx.fillText(new Date().toLocaleDateString('pt-BR'), canvas.width - 120, 415);
+
+      // Table Header
+      let currentY = 550;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#f1f5f9';
+      ctx.fillRect(80, currentY, canvas.width - 160, 70);
+      ctx.fillStyle = '#475569';
+      ctx.font = 'bold 30px Helvetica';
+      ctx.fillText('PRODUTO / DESCRIÇÃO', 120, currentY + 45);
+      ctx.textAlign = 'right';
+      ctx.fillText('TOTAL', canvas.width - 120, currentY + 45);
+
+      // Items
+      currentY += 120;
+      ctx.textAlign = 'left';
+      ctx.font = '32px Helvetica';
+      ctx.fillStyle = '#334155';
+
+      items.forEach(item => {
+        const p = products.find(prod => prod.id === item.productId);
+        const v = p?.variations.find(varItem => varItem.id === item.variationId);
+        let desc = `${item.quantity}x ${p?.name || 'Item'}`;
+        if (v?.colorName) desc += ` - ${v.colorName}`;
+        if (item.size) desc += ` (${item.size})`;
+
+        ctx.fillText(desc, 120, currentY);
+        ctx.textAlign = 'right';
+        ctx.fillText(`R$ ${(item.quantity * item.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 120, currentY);
+        ctx.textAlign = 'left';
+        currentY += 70;
+      });
+
+      // Totals
+      currentY += 40;
+      ctx.textAlign = 'right';
+      ctx.font = '30px Helvetica';
+      ctx.fillStyle = '#64748b';
+      ctx.fillText(`Valor da Compra: R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 80, currentY);
+      
+      currentY += 50;
+      ctx.fillStyle = '#e11d48';
+      const discountTextValue = discountType === 'percentage' ? `${discount}%` : `R$ ${discount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      ctx.fillText(`Valor de Desconto: - ${discountTextValue}`, canvas.width - 80, currentY);
+
+      currentY += 80;
+      ctx.fillStyle = '#4f46e5';
+      ctx.font = 'bold 60px Helvetica';
+      ctx.fillText(`VALOR TOTAL: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 80, currentY);
+
+      // Observation
+      if (observation) {
+        currentY += 120;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 25px Helvetica';
+        ctx.fillText('OBSERVAÇÃO:', 80, currentY);
+        ctx.font = '22px Helvetica';
+        ctx.fillStyle = '#475569';
+        
+        // Wrap text
+        const words = observation.split(' ');
+        let line = '';
+        let obsY = currentY + 40;
+        for (let n = 0; n < words.length; n++) {
+          let testLine = line + words[n] + ' ';
+          let metrics = ctx.measureText(testLine);
+          if (metrics.width > canvas.width - 160 && n > 0) {
+            ctx.fillText(line, 80, obsY);
+            line = words[n] + ' ';
+            obsY += 35;
+          } else {
+            line = testLine;
+          }
+        }
+        ctx.fillText(line, 80, obsY);
+      }
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      const fileName = `${status === SaleStatus.QUOTE ? 'Orcamento' : 'Venda'}_${orderNumber}.jpg`;
+      await shareImage(dataUrl, fileName);
+      setExportModal({ ...exportModal, isOpen: false });
+    } catch (error) {
+      console.error('Erro ao gerar JPG:', error);
+      alert('Erro ao gerar imagem da venda.');
+    }
   };
 
   return (
@@ -1252,20 +1423,28 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
               />
             </div>
 
-            <div className="p-8 pt-0 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-8 pt-0 grid grid-cols-1 sm:grid-cols-3 gap-3">
               <button
-                onClick={handleExportPDF}
-                className="flex-1 flex items-center justify-center gap-2 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-black text-[10px] uppercase tracking-widest border border-slate-100 dark:border-slate-700 active:scale-95 transition-all"
+                onClick={() => setExportModal({ isOpen: true, type: 'PDF' })}
+                className="flex-1 flex items-center justify-center gap-2 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-black text-[9px] uppercase tracking-widest border border-slate-100 dark:border-slate-700 active:scale-95 transition-all"
                 aria-label="Exportar PDF da venda"
                 title="Exportar PDF"
               >
-                <Share2 size={20} strokeWidth={2.5} /> Exportar PDF
+                <FileText size={18} strokeWidth={2.5} /> PDF
+              </button>
+              <button
+                onClick={() => setExportModal({ isOpen: true, type: 'JPG' })}
+                className="flex-1 flex items-center justify-center gap-2 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-black text-[9px] uppercase tracking-widest border border-slate-100 dark:border-slate-700 active:scale-95 transition-all"
+                aria-label="Exportar JPG da venda"
+                title="Exportar JPG"
+              >
+                <Share2 size={18} strokeWidth={2.5} /> JPG
               </button>
               <button
                 onClick={sendWhatsApp}
-                className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white py-5 rounded-[1.5rem] flex items-center justify-center gap-3 font-black uppercase tracking-widest text-[11px] shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                className="sm:col-span-1 bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[9px] shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
               >
-                <Share size={20} strokeWidth={2.5} /> Enviar WhatsApp
+                <Share size={18} strokeWidth={2.5} /> WhatsApp
               </button>
             </div>
           </div>
@@ -1580,6 +1759,18 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
         </div>
       )}
 
+      {exportModal.isOpen && (
+        <ExportNoteModal
+          isOpen={exportModal.isOpen}
+          type={exportModal.type}
+          isDarkMode={isDarkMode}
+          onClose={() => setExportModal({ ...exportModal, isOpen: false })}
+          onConfirm={(obs, type) => {
+            if (type === 'PDF') handleExportPDF(obs);
+            else handleExportJPG(obs);
+          }}
+        />
+      )}
     </div>
   );
 }

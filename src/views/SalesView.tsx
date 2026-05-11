@@ -7,6 +7,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { sharePDF, shareImage } from '../utils/pdfShare';
 import SalePaymentModal from '../components/SalePaymentModal';
+import ExportNoteModal from '../components/ExportNoteModal';
 
 interface SalesViewProps {
   sales: Sale[];
@@ -58,6 +59,7 @@ export default function SalesView({
   const [whatsappMode, setWhatsappMode] = useState<'AUTO' | 'MANUAL'>('AUTO');
   const [editingMessage, setEditingMessage] = useState<{ sale: Sale, text: string } | null>(null);
   const [noteModal, setNoteModal] = useState<{ isOpen: boolean, note: string } | null>(null);
+  const [exportModal, setExportModal] = useState<{ isOpen: boolean, type: 'PDF' | 'JPG', sale: Sale | null }>({ isOpen: false, type: 'PDF', sale: null });
 
   // Mapas para busca rápida O(1)
   const productMap = useMemo(() => {
@@ -161,7 +163,7 @@ export default function SalesView({
     if (customMessage) setEditingMessage(null);
   };
 
-  const handleExportPDF = async (sale: Sale) => {
+  const handleExportPDF = async (sale: Sale, observation?: string) => {
     try {
       const doc = new jsPDF('p', 'mm', 'a4');
       const pageWidth = doc.internal.pageSize.width;
@@ -173,15 +175,13 @@ export default function SalesView({
       const textColor = [51, 65, 85];    // slate-700
       const lightTextColor = [148, 163, 184]; // slate-400
 
-      // 1. Header Design (Modern Gradient-like)
+      // 1. Header Design
       doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.rect(0, 0, pageWidth, 45, 'F');
       
-      // Accent line
       doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
       doc.rect(0, 45, pageWidth, 2, 'F');
 
-      // Título do Sistema
       doc.setTextColor(255, 255, 255);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(22);
@@ -192,22 +192,18 @@ export default function SalesView({
       doc.setTextColor(200, 200, 200);
       doc.text(sale.status === SaleStatus.QUOTE ? 'ORÇAMENTO' : 'VENDA CONFIRMADA', margin, 32);
 
-      // Aviso de Valor Fiscal
       doc.setFontSize(7);
       doc.setTextColor(255, 100, 100);
       doc.text('ESTE DOCUMENTO NÃO TEM VALOR FISCAL', margin, 38);
 
-      // Número do Pedido no Canto Superior Direito
       doc.setTextColor(255, 255, 255);
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text(`#${sale.orderNumber}`, pageWidth - margin, 28, { align: 'right' });
 
-      // 2. Info Section (Customer & Date)
+      // 2. Info Section
       const startY = 65;
-      
-      // Card Background for Info
-      doc.setFillColor(248, 250, 252); // slate-50
+      doc.setFillColor(248, 250, 252);
       doc.roundedRect(margin, startY, pageWidth - (margin * 2), 25, 2, 2, 'F');
 
       doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -274,25 +270,44 @@ export default function SalesView({
       
       doc.setFontSize(9);
       doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
-      doc.text('Subtotal:', summaryX, finalY);
+      doc.text('Valor da Compra:', summaryX, finalY);
       doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.text(`R$ ${sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin, finalY, { align: 'right' });
+      doc.text(`R$ ${sale.subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin, finalY, { align: 'right' });
+
+      doc.setTextColor(lightTextColor[0], lightTextColor[1], lightTextColor[2]);
+      doc.text('Valor de Desconto:', summaryX, finalY + 8);
+      doc.setTextColor(225, 29, 72); // rose-600
+      const discountText = sale.discountType === 'percentage' ? `${sale.discount}%` : `R$ ${sale.discount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      doc.text(`- ${discountText}`, pageWidth - margin, finalY + 8, { align: 'right' });
 
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
-      doc.text('TOTAL GERAL:', summaryX, finalY + 10);
-      doc.text(`R$ ${sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin, finalY + 10, { align: 'right' });
+      doc.text('VALOR TOTAL:', summaryX, finalY + 18);
+      doc.text(`R$ ${sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageWidth - margin, finalY + 18, { align: 'right' });
 
-      // 5. Notes / Footer
+      // 5. Notes / Observation
+      let noteY = finalY + 35;
+      
+      if (observation) {
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        doc.text('OBSERVAÇÃO DO DOCUMENTO:', margin, noteY);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(textColor[0], textColor[1], textColor[2]);
+        doc.text(observation, margin, noteY + 7, { maxWidth: pageWidth - (margin * 2) });
+        noteY += 25;
+      }
+
       if (sale.notes) {
         doc.setFontSize(8);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-        doc.text('OBSERVAÇÕES:', margin, finalY + 25);
+        doc.text('NOTAS DO PEDIDO:', margin, noteY);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(textColor[0], textColor[1], textColor[2]);
-        doc.text(sale.notes, margin, finalY + 32, { maxWidth: pageWidth - (margin * 2) });
+        doc.text(sale.notes, margin, noteY + 7, { maxWidth: pageWidth - (margin * 2) });
       }
 
       // Footer Banner
@@ -305,13 +320,14 @@ export default function SalesView({
 
       const fileName = `${sale.status === SaleStatus.QUOTE ? 'Orcamento' : 'Pedido'}_${sale.orderNumber}.pdf`;
       await sharePDF(doc, fileName);
+      setExportModal({ isOpen: false, type: 'PDF', sale: null });
     } catch (error) {
       console.error('Erro ao gerar PDF:', error);
       alert('Erro ao gerar PDF da venda.');
     }
   };
 
-  const handleExportJPG = async (sale: Sale) => {
+  const handleExportJPG = async (sale: Sale, observation?: string) => {
     try {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d')!;
@@ -390,16 +406,55 @@ export default function SalesView({
         currentY += 70;
       });
 
-      // Total
-      currentY += 60;
+      // Totals
+      currentY += 40;
+      ctx.textAlign = 'right';
+      ctx.font = '30px Helvetica';
+      ctx.fillStyle = '#64748b';
+      ctx.fillText(`Valor da Compra: R$ ${sale.subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 80, currentY);
+      
+      currentY += 50;
+      ctx.fillStyle = '#e11d48';
+      const discountText = sale.discountType === 'percentage' ? `${sale.discount}%` : `R$ ${sale.discount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+      ctx.fillText(`Valor de Desconto: - ${discountText}`, canvas.width - 80, currentY);
+
+      currentY += 80;
       ctx.fillStyle = '#4f46e5';
       ctx.font = 'bold 60px Helvetica';
-      ctx.textAlign = 'right';
-      ctx.fillText(`TOTAL: R$ ${sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 80, currentY);
+      ctx.fillText(`VALOR TOTAL: R$ ${sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 80, currentY);
+
+      // Observation
+      if (observation) {
+        currentY += 120;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 25px Helvetica';
+        ctx.fillText('OBSERVAÇÃO:', 80, currentY);
+        ctx.font = '22px Helvetica';
+        ctx.fillStyle = '#475569';
+        
+        // Wrap text
+        const words = observation.split(' ');
+        let line = '';
+        let obsY = currentY + 40;
+        for (let n = 0; n < words.length; n++) {
+          let testLine = line + words[n] + ' ';
+          let metrics = ctx.measureText(testLine);
+          if (metrics.width > canvas.width - 160 && n > 0) {
+            ctx.fillText(line, 80, obsY);
+            line = words[n] + ' ';
+            obsY += 35;
+          } else {
+            line = testLine;
+          }
+        }
+        ctx.fillText(line, 80, obsY);
+      }
 
       const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
       const fileName = `${sale.status === SaleStatus.QUOTE ? 'Orcamento' : 'Venda'}_${sale.orderNumber}.jpg`;
       await shareImage(dataUrl, fileName);
+      setExportModal({ isOpen: false, type: 'JPG', sale: null });
     } catch (error) {
       console.error('Erro ao gerar JPG:', error);
       alert('Erro ao gerar imagem da venda.');
@@ -626,13 +681,13 @@ export default function SalesView({
                 </div>
                 <div className={`flex items-center gap-1.5 p-1.5 rounded-2xl ${isDarkMode ? 'bg-slate-800/80' : 'bg-slate-50 shadow-inner'}`}>
                   <button 
-                    onClick={() => handleExportPDF(sale)}
+                    onClick={() => setExportModal({ isOpen: true, type: 'PDF', sale })}
                     className="flex items-center justify-center w-9 h-9 rounded-xl text-rose-600 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all active:scale-95 border border-rose-100 dark:border-rose-500/20 text-[9px] font-black"
                   >
                     PDF
                   </button>
                   <button 
-                    onClick={() => handleExportJPG(sale)}
+                    onClick={() => setExportModal({ isOpen: true, type: 'JPG', sale })}
                     className="flex items-center justify-center w-9 h-9 rounded-xl text-blue-600 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-all active:scale-95 border border-blue-100 dark:border-blue-500/20 text-[9px] font-black"
                   >
                     JPG
@@ -705,7 +760,7 @@ export default function SalesView({
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleExportPDF(sale);
+                          setExportModal({ isOpen: true, type: 'PDF', sale });
                           setShowOptionsId(null);
                         }}
                         className="w-full flex items-center gap-2.5 p-3 text-left text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all"
@@ -747,6 +802,19 @@ export default function SalesView({
       >
          <Plus size={32} strokeWidth={2.5} />
       </button>
+
+      {exportModal.isOpen && exportModal.sale && (
+        <ExportNoteModal
+          isOpen={exportModal.isOpen}
+          type={exportModal.type}
+          isDarkMode={isDarkMode}
+          onClose={() => setExportModal({ ...exportModal, isOpen: false })}
+          onConfirm={(obs, type) => {
+            if (type === 'PDF') handleExportPDF(exportModal.sale!, obs);
+            else handleExportJPG(exportModal.sale!, obs);
+          }}
+        />
+      )}
 
       {selectedSale && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={() => setSelectedSale(null)}>
