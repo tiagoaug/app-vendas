@@ -150,6 +150,7 @@ export type Sale = {
   items: SaleItem[];
   subtotal: number;
   discount: number;
+  discountType?: 'fixed' | 'percentage';
   total: number;
   status: SaleStatus;
   paymentTerm: PaymentTerm;

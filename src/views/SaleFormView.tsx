@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { Sale, Product, SaleType, SaleItem, SalePayment, Grid, Person, PaymentMethod, SaleStatus, PaymentTerm, Account, ProductStatus, PaymentStatus } from '../types';
 import { firebaseService } from '../services/firebaseService';
 import ComboBox from '../components/ComboBox';
-import { Receipt, Plus, Minus, Package, ChevronDown, ChevronUp, Trash2, Box, Info, X, Send, FileText, Download, CheckCircle2, ShoppingCart, Calendar, Clock, CreditCard, Wallet, Share2, Share, TrendingUp, MessageSquare, Percent, Ban, RotateCcw, Save, Search, Copy } from 'lucide-react';
+import { Receipt, Plus, Minus, Package, ChevronDown, ChevronUp, Trash2, Box, Info, X, Send, FileText, Download, CheckCircle2, ShoppingCart, Calendar, Clock, CreditCard, Wallet, Share2, Share, TrendingUp, MessageSquare, Percent, Ban, RotateCcw, Save, Search, Copy, DollarSign } from 'lucide-react';
 import { sharePDF } from '../utils/pdfShare';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -85,6 +85,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
   const [paymentMethodId, setPaymentMethodId] = useState(paymentMethods[0]?.id || '');
   const [accountId, setAccountId] = useState(accounts.find(a => a.isDefault)?.id || accounts[0]?.id || '');
   const [discount, setDiscount] = useState(0);
+  const [discountType, setDiscountType] = useState<'fixed' | 'percentage'>('fixed');
+
   const [dueDate, setDueDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(PaymentStatus.PAID);
   const [paymentHistory, setPaymentHistory] = useState<SalePayment[]>([]);
@@ -118,6 +120,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
           setPaymentMethodId(sale.paymentMethodId || '');
           setAccountId(sale.accountId || '');
           setDiscount(sale.discount || 0);
+          setDiscountType(sale.discountType || 'fixed');
           setPaymentStatus(sale.paymentStatus || PaymentStatus.PAID);
           setPaymentHistory(sale.paymentHistory || []);
           setNotes(sale.notes || '');
@@ -172,7 +175,12 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
     }, 0);
   }, [blocks]);
 
-  const total = useMemo(() => Math.max(0, subtotal - discount), [subtotal, discount]);
+  const total = useMemo(() => {
+    if (discountType === 'percentage') {
+      return Math.max(0, subtotal * (1 - discount / 100));
+    }
+    return Math.max(0, subtotal - discount);
+  }, [subtotal, discount, discountType]);
 
   const amountPaid = useMemo(() => {
     return paymentHistory.reduce((acc, p) => acc + p.amount, 0);
@@ -327,6 +335,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
       items,
       subtotal,
       discount,
+      discountType,
       total,
       status,
       paymentTerm,
@@ -394,7 +403,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
     const paymentInfo = paymentMethod?.value ? `\n\n💳 *Pagamento: ${paymentMethod.name}*\nchave pix: ${paymentMethod.value}` : `\n\n💳 *Pagamento: ${paymentMethod?.name || 'A definir'}*`;
 
     const statusText = status === SaleStatus.QUOTE ? 'ORÇAMENTO' : 'PEDIDO';
-    const discountText = discount > 0 ? `\n📉 *Desconto:* R$ ${discount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
+    const discountText = discount > 0 ? `\n📉 *Desconto:* ${discountType === 'percentage' ? `${discount}%` : `R$ ${discount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}` : '';
 
     return `Olá ${customer?.name || 'Cliente'}!\n\nSeu ${statusText} #${orderNumber}.\n\n*ITENS:*\n${itemsText}\n\n------------------\n💰 *Subtotal:* R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${discountText}\n💎 *TOTAL: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*\n------------------\nStatus: ${statusText}${paymentInfo}\n\nAguardamos sua confirmação!`;
   };
@@ -550,7 +559,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
     doc.setTextColor(15, 23, 42);
     doc.text(`R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 190, finalY + 10, { align: 'right' });
     doc.setTextColor(225, 29, 72);
-    doc.text(`- R$ ${discount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 190, finalY + 18, { align: 'right' });
+    const discountFormatted = discountType === 'percentage' ? `${discount}%` : `R$ ${discount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    doc.text(`- ${discountFormatted}`, 190, finalY + 18, { align: 'right' });
 
     doc.setFillColor(15, 23, 42);
     doc.rect(130, finalY + 25, 60, 12, 'F');
@@ -1119,26 +1129,52 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
             </div>
           </div>
 
-          <div className="flex items-center gap-3 mt-4">
+          <div className="flex items-end gap-3 mt-4">
             <div className="flex-1 flex flex-col gap-1.5">
-              <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest pl-1">Desconto (R$)</label>
+              <label className="text-[8px] font-black text-slate-400 uppercase tracking-widest pl-1">Desconto ({discountType === 'percentage' ? '%' : 'R$'})</label>
               <div className="relative">
                 <input
                   type="number"
                   step="0.01"
-                  className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl py-3 pl-3 pr-8 text-xs font-black text-rose-500"
-                  value={discount}
+                  className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-xl py-3.5 px-4 text-sm font-black text-rose-500 focus:ring-4 focus:ring-rose-500/5 transition-all"
+                  value={discount === 0 ? '' : discount}
                   title="Desconto"
                   aria-label="Valor do desconto"
-                  placeholder="0.00"
-                  onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                  placeholder="0"
+                  onFocus={(e) => e.target.select()}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || value === '-') {
+                      setDiscount(0);
+                    } else {
+                      const parsed = parseFloat(value);
+                      if (!isNaN(parsed)) {
+                        setDiscount(parsed);
+                      }
+                    }
+                  }}
                 />
-                <Percent size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300" />
               </div>
             </div>
+
+            <button
+              onClick={() => setDiscountType(prev => prev === 'percentage' ? 'fixed' : 'percentage')}
+              className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center transition-all shadow-md active:scale-90 ${discountType === 'percentage'
+                  ? 'bg-amber-500 text-white shadow-amber-500/20'
+                  : 'bg-indigo-600 text-white shadow-indigo-500/20'
+                }`}
+              title={`Mudar para ${discountType === 'percentage' ? 'Valor Fixo (R$)' : 'Porcentagem (%)'}`}
+            >
+              {discountType === 'percentage' ? (
+                <Percent size={20} strokeWidth={3} />
+              ) : (
+                <DollarSign size={20} strokeWidth={3} />
+              )}
+            </button>
+
             <button
               onClick={handleWhatsApp}
-              className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${customerId ? 'bg-emerald-500 text-white shadow-lg' : 'bg-slate-100 dark:bg-slate-800 text-slate-300'}`}
+              className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${customerId ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-300'}`}
               disabled={!customerId}
               title="Compartilhar via WhatsApp"
               aria-label="Compartilhar pedido via WhatsApp"
