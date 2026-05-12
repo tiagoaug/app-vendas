@@ -71,14 +71,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
     }
   }, [sales, saleId, isAutoOrderNumber, isInitialized]);
 
-  useEffect(() => {
-    if (saleId) {
-      const sale = sales.find(s => s.id === saleId);
-      if (sale && sale.status !== status) {
-        setStatus(sale.status);
-      }
-    }
-  }, [sales, saleId, status]);
+
 
 
 
@@ -818,8 +811,14 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
             Venda
           </button>
           <button
-            onClick={() => setStatus(SaleStatus.QUOTE)}
-            className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${status === SaleStatus.QUOTE ? 'bg-amber-500 text-white shadow-lg' : 'text-slate-400'}`}
+            onClick={() => {
+              if (amountPaid > 0) {
+                alert('Não é possível mudar para orçamento pois há recebimentos na venda. Primeiro você teria de excluir o pagamento para poder alterar para orçamento novamente.');
+                return;
+              }
+              setStatus(SaleStatus.QUOTE);
+            }}
+            className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${status === SaleStatus.QUOTE ? 'bg-amber-500 text-white shadow-lg' : 'text-slate-400'} ${amountPaid > 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
             aria-label="Definir como orçamento"
             title="Orçamento"
           >
@@ -1372,11 +1371,11 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
               </div>
               <button
                 onClick={() => setShowWhatsAppModal(false)}
-                className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-rose-500 transition-colors"
+                className="w-10 h-10 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-90"
                 title="Fechar"
                 aria-label="Fechar prévia do WhatsApp"
               >
-                <X size={24} />
+                <X size={28} />
               </button>
             </div>
 
@@ -1423,28 +1422,30 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
               />
             </div>
 
-            <div className="p-8 pt-0 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <button
-                onClick={() => setExportModal({ isOpen: true, type: 'PDF' })}
-                className="flex-1 flex items-center justify-center gap-2 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-black text-[9px] uppercase tracking-widest border border-slate-100 dark:border-slate-700 active:scale-95 transition-all"
-                aria-label="Exportar PDF da venda"
-                title="Exportar PDF"
-              >
-                <FileText size={18} strokeWidth={2.5} /> PDF
-              </button>
-              <button
-                onClick={() => setExportModal({ isOpen: true, type: 'JPG' })}
-                className="flex-1 flex items-center justify-center gap-2 py-4 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-2xl font-black text-[9px] uppercase tracking-widest border border-slate-100 dark:border-slate-700 active:scale-95 transition-all"
-                aria-label="Exportar JPG da venda"
-                title="Exportar JPG"
-              >
-                <Share2 size={18} strokeWidth={2.5} /> JPG
-              </button>
+            <div className="p-8 pt-0 flex items-center justify-between gap-3 flex-wrap">
+              <div className={`flex items-center gap-2 p-1.5 rounded-2xl ${isDarkMode ? 'bg-slate-800/50' : 'bg-slate-100 shadow-inner'}`}>
+                <button
+                  onClick={() => setExportModal({ isOpen: true, type: 'PDF' })}
+                  className="flex items-center justify-center w-12 h-12 rounded-xl text-rose-600 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all active:scale-95 border border-rose-100 dark:border-rose-500/20 text-[11px] font-black"
+                  aria-label="Exportar PDF da venda"
+                  title="Exportar PDF"
+                >
+                  PDF
+                </button>
+                <button
+                  onClick={() => setExportModal({ isOpen: true, type: 'JPG' })}
+                  className="flex items-center justify-center w-12 h-12 rounded-xl text-blue-600 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-all active:scale-95 border border-blue-100 dark:border-blue-500/20 text-[11px] font-black"
+                  aria-label="Exportar JPG da venda"
+                  title="Exportar JPG"
+                >
+                  JPG
+                </button>
+              </div>
               <button
                 onClick={sendWhatsApp}
-                className="sm:col-span-1 bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[9px] shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                className="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2.5 rounded-xl flex items-center justify-center gap-2 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
               >
-                <Share size={18} strokeWidth={2.5} /> WhatsApp
+                <Share size={16} strokeWidth={2.5} /> WhatsApp
               </button>
             </div>
           </div>

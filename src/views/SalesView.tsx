@@ -110,6 +110,16 @@ export default function SalesView({
     }).sort((a, b) => b.date - a.date); // Mais recentes primeiro
   }, [sales, filter, paymentFilter, selectedStatuses, searchQuery, yearFilter]);
 
+  const totals = useMemo(() => {
+    return filteredSales.reduce((acc, sale) => {
+      const paid = (sale.paymentHistory || []).reduce((sum, p) => sum + p.amount, 0);
+      const remaining = Math.max(0, sale.total - paid);
+      acc.totalPaid += paid;
+      acc.totalRemaining += remaining;
+      return acc;
+    }, { totalPaid: 0, totalRemaining: 0 });
+  }, [filteredSales]);
+
   const getProductInfo = (productId: string) => productMap.get(productId);
 
   const getVariationInfo = (productId: string, variationId: string) => {
@@ -476,6 +486,17 @@ export default function SalesView({
           >
             <Filter size={18} strokeWidth={2.5} className={!showFilters ? "animate-pulse-blue" : ""} />
           </button>
+
+          <div className="ml-auto flex items-center gap-4">
+            <div className="flex flex-col items-end">
+              <span className="text-[7px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-0.5">Recebido</span>
+              <span className="text-xs font-black text-emerald-500 tabular-nums">R$ {totals.totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex flex-col items-end">
+              <span className="text-[7px] font-black text-slate-400 uppercase tracking-[0.2em] leading-none mb-0.5">Em Aberto</span>
+              <span className="text-xs font-black text-amber-500 tabular-nums">R$ {totals.totalRemaining.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+            </div>
+          </div>
         </div>
 
             <div className={`flex flex-col gap-2 transition-all duration-300 ${showFilters ? 'h-auto opacity-100' : 'h-0 opacity-0 overflow-hidden'}`}>
@@ -782,6 +803,21 @@ export default function SalesView({
                   </div>
                 )}
               </div>
+
+              {sale.status === SaleStatus.QUOTE && (
+                <div className="mt-4 pt-4 border-t border-slate-50 dark:border-slate-800">
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onConvert(sale.id);
+                    }}
+                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl flex items-center justify-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-lg shadow-emerald-500/20 active:scale-[0.98] animate-in fade-in zoom-in-95 duration-300"
+                  >
+                    <CheckCircle2 size={18} strokeWidth={3} />
+                    Confirmar como Venda
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}

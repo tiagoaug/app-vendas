@@ -1,11 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { Download, ArrowLeft, Calendar, Filter, Copy, Check, MessageCircle, FileText, Hash, Share2 } from 'lucide-react';
-import { sharePDF } from '../utils/pdfShare';
+import { Download, ArrowLeft, Calendar, Filter, Copy, Check, MessageCircle, FileText, Hash, Share2, X } from 'lucide-react';
+import { sharePDF, shareImage } from '../utils/pdfShare';
 import { Sale, Transaction, Product, Person, SaleStatus, TransactionType, Category } from '../types';
 import { format, startOfMonth, endOfMonth, parseISO, isWithinInterval } from 'date-fns';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ComboBox from '../components/ComboBox';
+import ExportNoteModal from '../components/ExportNoteModal';
 
 const PDF_COLORS = {
   PRIMARY: [63, 81, 181] as [number, number, number],
@@ -81,6 +82,7 @@ export default function ReportDetailedView({
 
   const [isConsolidatedModalOpen, setIsConsolidatedModalOpen] = useState(false);
   const [selectedConsolidatedIds, setSelectedConsolidatedIds] = useState<Set<string>>(new Set());
+  const [exportModal, setExportModal] = useState<{ isOpen: boolean, type: 'PDF' | 'JPG' }>({ isOpen: false, type: 'PDF' });
 
   const filterByDateRange = (dateNum: number) => {
     if (!startDate && !endDate) return true;
@@ -492,7 +494,7 @@ export default function ReportDetailedView({
       }
   };
 
-  const exportConsolidatedPDF = async () => {
+  const exportConsolidatedPDF = async (observation?: string) => {
     try {
       const isSupplier = reportId === 'dividas-fornecedor';
       const reportData = isSupplier ? dividasFornecedorData : relacionamentoClienteData;
@@ -629,7 +631,7 @@ export default function ReportDetailedView({
               
               // Use explicit right alignment to prevent overlap
               const totalText = `TOTAL: R$ ${(item.total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-              doc.text(totalText, pageWidth - 60, currentY + 6.5, { align: 'right' });
+              doc.text(totalText, pageWidth - 70, currentY + 6.5, { align: 'right' });
               
               const pendingText = `PENDENTE: R$ ${(item.pending || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
               if ((item.pending || 0) > 0) {
@@ -637,7 +639,7 @@ export default function ReportDetailedView({
               } else {
                 doc.setTextColor(PDF_COLORS.SUCCESS[0], PDF_COLORS.SUCCESS[1], PDF_COLORS.SUCCESS[2]);
               }
-              doc.text(pendingText, pageWidth - 18, currentY + 6.5, { align: 'right' });
+              doc.text(pendingText, pageWidth - 14, currentY + 6.5, { align: 'right' });
               
               currentY += 10;
 
@@ -715,7 +717,7 @@ export default function ReportDetailedView({
       }
 
       // Final Footer Summary
-      if (currentY > pageHeight - 40) {
+      if (currentY > pageHeight - 60) {
           doc.addPage();
           currentY = 20;
       }
@@ -737,12 +739,287 @@ export default function ReportDetailedView({
       doc.setFont('helvetica', 'bold');
       doc.text(`Saldo Total devedor: R$ ${totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 14, currentY + 20);
 
+      if (observation) {
+        currentY += 30;
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(PDF_COLORS.PRIMARY[0], PDF_COLORS.PRIMARY[1], PDF_COLORS.PRIMARY[2]);
+        doc.text('OBSERVAÇÃO DO DOCUMENTO:', 14, currentY);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(PDF_COLORS.SECONDARY[0], PDF_COLORS.SECONDARY[1], PDF_COLORS.SECONDARY[2]);
+        doc.text(observation, 14, currentY + 5, { maxWidth: pageWidth - 28 });
+      }
+
       // Sanitize filename for Android
       const safeFileName = `Extrato_${contactName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
       await sharePDF(doc, safeFileName);
+      setExportModal({ isOpen: false, type: 'PDF' });
     } catch (error: any) {
       console.error('Error generating consolidated PDF:', error);
       alert(`Erro ao gerar PDF Consolidado: ${error.message || 'Dados inválidos ou erro de memória'}`);
+    }
+  };
+
+  const handleExportConsolidatedJPG = async (observation?: string) => {
+    try {
+      const isSupplier = reportId === 'dividas-fornecedor';
+      const reportData = isSupplier ? dividasFornecedorData : relacionamentoClienteData;
+      const selectedItems = reportData.filter(r => selectedConsolidatedIds.has(r.id));
+      if (selectedItems.length === 0) return;
+      
+      const contactName = isSupplier 
+        ? (selectedItems[0]?.supplierObj?.name || selectedItems[0]?.supplierName || 'Fornecedor')
+        : (selectedItems[0]?.customerObj?.name || selectedItems[0]?.customerName || 'Cliente');
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      canvas.width = 1200;
+      
+      // Calculate height dynamically
+      let height = 650; // Header + Summary + Padding
+      if (messageFormat === 'RESUMO') {
+        height += selectedItems.length * 80 + 100;
+      } else {
+        selectedItems.forEach(item => {
+          height += 120; // Order header
+          if (item.isManual) {
+            height += 60; // Description
+            if (item.items) height += item.items.length * 50;
+          } else {
+            if (item.items) height += item.items.length * 50;
+            if (item.paymentHistory) height += item.paymentHistory.length * 50;
+          }
+          height += 40; // Spacer
+        });
+      }
+      if (observation) height += 200;
+      height += 100; // Footer
+      canvas.height = height;
+
+      // Background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Header
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(0, 0, canvas.width, 250);
+      ctx.fillStyle = '#4f46e5';
+      ctx.fillRect(0, 250, canvas.width, 10);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 60px Helvetica';
+      ctx.fillText('EXTRATO CONSOLIDADO', 80, 100);
+      
+      ctx.font = '30px Helvetica';
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(`${isSupplier ? 'FORNECEDOR' : 'CLIENTE'}: ${contactName.toUpperCase()}`, 80, 160);
+      ctx.fillText(`EMISSÃO: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 80, 205);
+      ctx.fillText(`FORMATO: ${messageFormat === 'RESUMO' ? 'RESUMO DE TOTAIS' : 'HISTÓRICO COMPLETO (ITENS)'}`, 80, 245);
+
+      // Summary Cards
+      let totalTotal = 0;
+      let totalPending = 0;
+      selectedItems.forEach(item => {
+          totalTotal += (item.total || 0);
+          totalPending += (item.pending || 0);
+      });
+
+      let currentY = 320;
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 35px Helvetica';
+      ctx.fillText('RESUMO FINANCEIRO', 80, currentY);
+      currentY += 40;
+
+      ctx.fillStyle = '#f8fafc';
+      ctx.roundRect ? (ctx as any).roundRect(80, currentY, 500, 120, 20) : ctx.rect(80, currentY, 500, 120);
+      ctx.fill();
+      ctx.fillStyle = '#64748b';
+      ctx.font = 'bold 25px Helvetica';
+      ctx.fillText('TOTAL EM COMPRAS', 110, currentY + 45);
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 45px Helvetica';
+      ctx.fillText(`R$ ${totalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 110, currentY + 100);
+
+      ctx.fillStyle = '#fff1f2';
+      ctx.roundRect ? (ctx as any).roundRect(620, currentY, 500, 120, 20) : ctx.rect(620, currentY, 500, 120);
+      ctx.fill();
+      ctx.fillStyle = '#991b1b';
+      ctx.font = 'bold 25px Helvetica';
+      ctx.fillText('SALDO EM ABERTO', 650, currentY + 45);
+      ctx.font = 'bold 45px Helvetica';
+      ctx.fillText(`R$ ${totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 650, currentY + 100);
+
+      currentY += 180;
+      ctx.textAlign = 'left';
+
+      if (messageFormat === 'RESUMO') {
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 40px Helvetica';
+        ctx.fillText(isSupplier ? 'LANÇAMENTOS / COMPRAS' : 'LANÇAMENTOS / VENDAS', 80, currentY);
+        currentY += 60;
+
+        // Table Header
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fillRect(80, currentY, canvas.width - 160, 60);
+        ctx.fillStyle = '#475569';
+        ctx.font = 'bold 25px Helvetica';
+        ctx.fillText('DATA', 100, currentY + 40);
+        ctx.fillText('DOCUMENTO', 280, currentY + 40);
+        ctx.fillText('DESCRIÇÃO', 500, currentY + 40);
+        ctx.textAlign = 'right';
+        ctx.fillText('TOTAL', canvas.width - 320, currentY + 40);
+        ctx.fillText('PENDENTE', canvas.width - 100, currentY + 40);
+        ctx.textAlign = 'left';
+        currentY += 90;
+
+        selectedItems.forEach((item, index) => {
+          if (index % 2 === 1) {
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(80, currentY - 50, canvas.width - 160, 70);
+          }
+          ctx.fillStyle = '#334155';
+          ctx.font = '24px Helvetica';
+          ctx.fillText(format(new Date(item.date), 'dd/MM/yyyy'), 100, currentY);
+          ctx.fillText(item.isManual ? 'MANUAL' : `#${item.orderNumber}`, 280, currentY);
+          const desc = (item.isManual ? item.description : (isSupplier ? 'COMPRA' : 'PEDIDO')).toUpperCase();
+          ctx.fillText(desc.substring(0, 25), 500, currentY);
+          ctx.textAlign = 'right';
+          ctx.fillText(`R$ ${item.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 320, currentY);
+          ctx.fillStyle = item.pending > 0 ? '#e11d48' : '#10b981';
+          ctx.fillText(`R$ ${item.pending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 100, currentY);
+          ctx.textAlign = 'left';
+          currentY += 70;
+        });
+      } else {
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 40px Helvetica';
+        ctx.fillText(isSupplier ? 'DETALHAMENTO POR COMPRA' : 'DETALHAMENTO POR PEDIDO', 80, currentY);
+        currentY += 60;
+
+        selectedItems.forEach(item => {
+          // Box header
+          ctx.fillStyle = '#f1f5f9';
+          ctx.fillRect(80, currentY, canvas.width - 160, 60);
+          ctx.fillStyle = '#1e293b';
+          ctx.font = 'bold 24px Helvetica';
+          const label = item.isManual ? 'LANC. MANUAL' : (isSupplier ? `COMPRA #${item.orderNumber}` : `PEDIDO #${item.orderNumber}`);
+          ctx.fillText(`${format(new Date(item.date), 'dd/MM/yyyy')} - ${label}`, 100, currentY + 40);
+          ctx.textAlign = 'right';
+          ctx.fillText(`TOTAL: R$ ${item.total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 550, currentY + 40);
+          ctx.fillStyle = item.pending > 0 ? '#991b1b' : '#10b981';
+          ctx.fillText(`PENDENTE: R$ ${item.pending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 100, currentY + 40);
+          ctx.textAlign = 'left';
+          currentY += 90;
+
+          if (item.isManual) {
+            ctx.fillStyle = '#64748b';
+            ctx.font = '20px Helvetica';
+            ctx.fillText(`Descrição: ${item.description || '-'}`, 120, currentY);
+            currentY += 40;
+            
+            if (item.items && item.items.length > 0) {
+              item.items.forEach((mi: any) => {
+                ctx.fillStyle = '#334155';
+                ctx.font = '20px Helvetica';
+                ctx.fillText(mi?.description || 'Item', 140, currentY);
+                ctx.textAlign = 'right';
+                ctx.fillText(`R$ ${(mi?.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 140, currentY);
+                ctx.textAlign = 'left';
+                currentY += 40;
+              });
+            }
+          } else {
+            (item.items || []).forEach((i: any) => {
+              const p = productsMap.get(i.productId);
+              const varObj = p?.variations.find(v => v.id === i?.variationId);
+              const prodName = p ? `${p.name} (${varObj?.colorName || ''})` : 'PRODUTO';
+              
+              ctx.fillStyle = '#334155';
+              ctx.font = '20px Helvetica';
+              ctx.fillText(`${i.quantity}x ${prodName}`, 120, currentY);
+              ctx.textAlign = 'right';
+              const unitVal = isSupplier ? (i.cost || 0) : (i.price || 0);
+              ctx.fillText(`(R$ ${unitVal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})`, canvas.width - 350, currentY);
+              ctx.fillText(`R$ ${(i.quantity * unitVal).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 120, currentY);
+              ctx.textAlign = 'left';
+              currentY += 40;
+            });
+
+            // Payment history in JPG
+            if (!item.isManual && (item as any).paymentHistory && (item as any).paymentHistory.length > 0) {
+              currentY += 10;
+              (item as any).paymentHistory.forEach((p: any) => {
+                ctx.fillStyle = isSupplier ? '#475569' : '#991b1b';
+                ctx.font = 'italic 20px Helvetica';
+                const pDate = format(new Date(p.date), 'dd/MM/yyyy');
+                ctx.fillText(`${pDate} - ${p.note || (isSupplier ? 'Pagamento' : 'Recebimento')}`, 140, currentY);
+                ctx.textAlign = 'right';
+                ctx.fillText(`- R$ ${(p.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 140, currentY);
+                ctx.textAlign = 'left';
+                currentY += 35;
+              });
+            }
+          }
+          currentY += 40;
+        });
+      }
+
+      // Final Summary Box
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(80, currentY);
+      ctx.lineTo(canvas.width - 80, currentY);
+      ctx.stroke();
+      currentY += 50;
+
+      ctx.fillStyle = '#1e293b';
+      ctx.font = 'bold 35px Helvetica';
+      ctx.fillText('RESUMO FINAL DO EXTRATO', 80, currentY);
+      currentY += 50;
+
+      ctx.font = '28px Helvetica';
+      ctx.fillStyle = '#334155';
+      ctx.fillText(`Total Acumulado: R$ ${totalTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 80, currentY);
+      currentY += 45;
+      
+      ctx.fillStyle = '#e11d48';
+      ctx.font = 'bold 32px Helvetica';
+      ctx.fillText(`Saldo Total devedor: R$ ${totalPending.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 80, currentY);
+      currentY += 60;
+
+      if (observation) {
+        currentY += 50;
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 28px Helvetica';
+        ctx.fillText('OBSERVAÇÃO:', 80, currentY);
+        currentY += 40;
+        ctx.fillStyle = '#475569';
+        ctx.font = '22px Helvetica';
+        
+        const words = observation.split(' ');
+        let line = '';
+        for (let n = 0; n < words.length; n++) {
+          let testLine = line + words[n] + ' ';
+          let metrics = ctx.measureText(testLine);
+          if (metrics.width > canvas.width - 200 && n > 0) {
+            ctx.fillText(line, 80, currentY);
+            line = words[n] + ' ';
+            currentY += 35;
+          } else {
+            line = testLine;
+          }
+        }
+        ctx.fillText(line, 80, currentY);
+      }
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      const safeFileName = `Extrato_${contactName.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
+      await shareImage(dataUrl, safeFileName);
+      setExportModal({ isOpen: false, type: 'JPG' });
+    } catch (error: any) {
+      console.error('Error generating consolidated JPG:', error);
+      alert(`Erro ao gerar JPG Consolidado: ${error.message}`);
     }
   };
 
@@ -1378,8 +1655,11 @@ export default function ReportDetailedView({
                   <h2 className="text-xl font-black">Mensagem Consolidada</h2>
                   <p className="text-sm text-slate-500">Selecione os itens para enviar ao cliente</p>
                 </div>
-                <button onClick={() => setIsConsolidatedModalOpen(false)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400">
-                  X
+                <button 
+                  onClick={() => setIsConsolidatedModalOpen(false)}
+                  className="w-10 h-10 flex items-center justify-center rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-90"
+                >
+                  <X size={28} />
                 </button>
               </div>
 
@@ -1425,33 +1705,55 @@ export default function ReportDetailedView({
                 </div>
               </div>
 
-              <div className={`p-6 border-t flex flex-wrap justify-end gap-3 ${isDarkMode ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50'} rounded-b-3xl`}>
-                <button 
-                  onClick={exportConsolidatedPDF}
-                  className="px-6 py-3 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all active:scale-95 flex items-center gap-2"
-                >
-                  <Share2 size={16} />
-                  Exportar PDF
-                </button>
-                <button 
-                  onClick={handleCopyConsolidated}
-                  className={`px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-colors ${isDarkMode ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-slate-700 border hover:bg-slate-50'}`}
-                >
-                  <Copy size={18} />
-                  Copiar Texto
-                </button>
-                <button 
-                  onClick={handleWhatsAppConsolidated}
-                  className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black flex items-center gap-2 shadow-lg shadow-emerald-500/30 transition-colors"
-                >
-                  <MessageCircle size={18} />
-                  Enviar WhatsApp
-                </button>
+              <div className={`p-6 border-t flex items-center justify-between gap-3 ${isDarkMode ? 'border-slate-800 bg-slate-900/50' : 'border-slate-100 bg-slate-50/50'} rounded-b-3xl flex-wrap`}>
+                <div className={`flex items-center gap-2 p-1.5 rounded-2xl ${isDarkMode ? 'bg-slate-800/50' : 'bg-slate-100 shadow-inner'}`}>
+                  <button 
+                    onClick={() => setExportModal({ isOpen: true, type: 'PDF' })}
+                    className="flex items-center justify-center w-12 h-12 rounded-xl text-rose-600 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 transition-all active:scale-95 border border-rose-100 dark:border-rose-500/20 text-[11px] font-black"
+                  >
+                    PDF
+                  </button>
+                  <button 
+                    onClick={() => setExportModal({ isOpen: true, type: 'JPG' })}
+                    className="flex items-center justify-center w-12 h-12 rounded-xl text-blue-600 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 transition-all active:scale-95 border border-blue-100 dark:border-blue-500/20 text-[11px] font-black"
+                  >
+                    JPG
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={handleCopyConsolidated}
+                    className={`px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 transition-all active:scale-95 ${isDarkMode ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
+                  >
+                    <Copy size={14} />
+                    Copiar
+                  </button>
+                  <button 
+                    onClick={handleWhatsAppConsolidated}
+                    className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+                  >
+                    <MessageCircle size={14} />
+                    WhatsApp
+                  </button>
+                </div>
               </div>
             </div>
           </div>
       )}
 
+      {exportModal.isOpen && (
+        <ExportNoteModal
+          isOpen={exportModal.isOpen}
+          type={exportModal.type}
+          isDarkMode={isDarkMode}
+          onClose={() => setExportModal({ ...exportModal, isOpen: false })}
+          onConfirm={(obs, type) => {
+            if (type === 'PDF') exportConsolidatedPDF(obs);
+            else handleExportConsolidatedJPG(obs);
+          }}
+        />
+      )}
     </div>
   );
 }
