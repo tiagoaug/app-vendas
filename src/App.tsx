@@ -424,19 +424,25 @@ export default function App() {
     }
   };
 
-  const handleCancelSale = async (id: string) => {
-    console.log("handleCancelSale chamado para ID:", id);
+  const handleCancelSale = async (id: string, isPermanent: boolean = false, skipConfirm: boolean = false) => {
+    console.log(`${isPermanent ? 'handleDeleteSale' : 'handleCancelSale'} chamado para ID:`, id);
     const sale = sales.find(s => s.id === id);
     if (!sale) {
-      console.error("Venda não encontrada no estado local:", id);
+      console.error("Venda não encontrada no sistema:", id);
       alert("Erro: Venda não encontrada no sistema.");
       return;
     }
 
-    if (sale.status === SaleStatus.CANCELLED) {
+    if (!isPermanent && sale.status === SaleStatus.CANCELLED) {
       alert("Esta venda já está cancelada.");
       return;
     }
+
+    const confirmMsg = isPermanent 
+      ? `ATENÇÃO: Você está prestes a EXCLUIR PERMANENTEMENTE a venda #${sale.orderNumber}.\n\nIsso irá:\n1. Estornar os estoques dos produtos.\n2. Estornar os saldos das contas (financeiro).\n3. Remover as transações relacionadas.\n4. Apagar o registro definitivamente.\n\nDeseja continuar?`
+      : `Deseja estornar e cancelar a venda #${sale.orderNumber}?\n\nIsso irá estornar estoques e financeiro, mas manterá o registro como CANCELADO.`;
+
+    if (!skipConfirm && !window.confirm(confirmMsg)) return;
 
     try {
       const uid = auth.currentUser?.uid;
@@ -532,14 +538,18 @@ export default function App() {
           }
         }
 
-        // D. Atualizar Status para CANCELADO
-        transaction.update(salesRef, { status: SaleStatus.CANCELLED });
+        // D. Finalizar: CANCELAR ou EXCLUIR
+        if (isPermanent) {
+          transaction.delete(salesRef);
+        } else {
+          transaction.update(salesRef, { status: SaleStatus.CANCELLED });
+        }
       });
 
-      alert('Venda cancelada com sucesso! Estoque e financeiro estornados.');
+      alert(isPermanent ? 'Venda excluída permanentemente! Estoque e financeiro estornados.' : 'Venda cancelada com sucesso! Estoque e financeiro estornados.');
     } catch (err: any) {
-      console.error("Erro ao cancelar venda:", err);
-      alert('Erro ao cancelar: ' + (err.message || err));
+      console.error("Erro na operação de venda:", err);
+      alert('Erro: ' + (err.message || err));
     }
   };
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Delete, Check, Plus, Minus, X as Multi, Disc as Divide, Percent, Trash2 } from 'lucide-react';
+import { X, Delete, Check, Plus, Minus, X as Multi, Divide, Percent, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface CalculatorModalProps {
@@ -96,7 +96,7 @@ export default function CalculatorModal({ isOpen, onClose, onResult, isDarkMode,
     { label: 'C', onClick: clear, color: 'text-rose-500' },
     { label: 'DEL', onClick: backspace, icon: Delete, color: 'text-rose-500' },
     { label: '%', onClick: () => setDisplay((parseFloat(display)/100).toString()), color: 'text-indigo-500' },
-    { label: '/', onClick: () => handleOperator('*'), icon: Divide, color: 'text-indigo-500' },
+    { label: '/', onClick: () => handleOperator('/'), icon: Divide, color: 'text-indigo-500' },
     { label: '7', onClick: () => handleNumber('7') },
     { label: '8', onClick: () => handleNumber('8') },
     { label: '9', onClick: () => handleNumber('9') },

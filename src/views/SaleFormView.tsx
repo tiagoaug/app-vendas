@@ -2,11 +2,13 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { Sale, Product, SaleType, SaleItem, SalePayment, Grid, Person, PaymentMethod, SaleStatus, PaymentTerm, Account, ProductStatus, PaymentStatus } from '../types';
 import { firebaseService } from '../services/firebaseService';
 import ComboBox from '../components/ComboBox';
-import { Receipt, Plus, Minus, Package, ChevronDown, ChevronUp, Trash2, Box, Info, X, Send, FileText, Download, CheckCircle2, ShoppingCart, Calendar, Clock, CreditCard, Wallet, Share2, Share, TrendingUp, MessageSquare, Percent, Ban, RotateCcw, Save, Search, Copy, DollarSign } from 'lucide-react';
+import { Receipt, Plus, Minus, Package, ChevronDown, ChevronUp, Trash2, Box, Info, X, Send, FileText, Download, CheckCircle2, ShoppingCart, Calendar, Clock, CreditCard, Wallet, Share2, Share, TrendingUp, MessageSquare, Percent, Ban, RotateCcw, Save, Search, Copy, DollarSign, Calculator } from 'lucide-react';
 import { sharePDF, shareImage } from '../utils/pdfShare';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ExportNoteModal from '../components/ExportNoteModal';
+import CalculatorModal from '../components/CalculatorModal';
+import { GeneralPurchaseItem } from '../types';
 
 interface SaleBlock {
   id: string;
@@ -36,6 +38,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
   const [isAutoOrderNumber, setIsAutoOrderNumber] = useState(!saleId);
   const [customerId, setCustomerId] = useState('');
   const [blocks, setBlocks] = useState<SaleBlock[]>([]);
+  const [otherItems, setOtherItems] = useState<GeneralPurchaseItem[]>([]);
   const [status, setStatus] = useState<SaleStatus>(SaleStatus.SALE);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
@@ -100,6 +103,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [exportModal, setExportModal] = useState<{ isOpen: boolean, type: 'PDF' | 'JPG' }>({ isOpen: false, type: 'PDF' });
+  const [calcModal, setCalcModal] = useState<{ isOpen: boolean; index: number; value: number } | null>(null);
 
   // Effect to initialize from saleId when data is available
   useEffect(() => {
@@ -123,6 +127,7 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
           if (sale.dueDate) {
             setDueDate(new Date(sale.dueDate).toISOString().split('T')[0]);
           }
+          setOtherItems(sale.otherItems || []);
 
           // Group items into blocks
           const blocksMap: Record<string, SaleBlock> = {};
@@ -161,14 +166,17 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
   }, [saleId, sales, products]);
 
   const subtotal = useMemo(() => {
-    return blocks.reduce((acc, block) => {
+    const itemsTotal = blocks.reduce((acc, block) => {
       const blockTotal = Object.values(block.variations).reduce<number>((sum, v) => {
         const item = v as { quantity: number; price: number };
         return sum + (item.price * item.quantity);
       }, 0);
       return acc + blockTotal;
     }, 0);
-  }, [blocks]);
+
+    const otherTotal = otherItems.reduce((acc, item) => acc + (item.value || 0), 0);
+    return itemsTotal + otherTotal;
+  }, [blocks, otherItems]);
 
   const total = useMemo(() => {
     if (discountType === 'percentage') {
@@ -275,6 +283,32 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
     setBlocks(newBlocks);
   };
 
+  const addOtherItem = () => {
+    setOtherItems([
+      ...otherItems,
+      {
+        id: Math.random().toString(36).substring(2, 9),
+        description: "",
+        value: 0,
+      },
+    ]);
+  };
+
+  const removeOtherItem = (index: number) => {
+    setOtherItems(otherItems.filter((_, i) => i !== index));
+  };
+
+  const updateOtherItem = (index: number, updates: Partial<GeneralPurchaseItem>) => {
+    const newItems = [...otherItems];
+    newItems[index] = { ...newItems[index], ...updates };
+    setOtherItems(newItems);
+  };
+
+  const openCalculator = (index: number) => {
+    const value = otherItems[index].value || 0;
+    setCalcModal({ isOpen: true, index, value });
+  };
+
   const checkStock = (productId: string, variationId: string, size?: string, quantity: number = 0): boolean => {
     const product = products.find(p => p.id === productId);
     const variation = product?.variations.find(v => v.id === variationId);
@@ -308,8 +342,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
   const handleSave = async () => {
     const items = getItems();
 
-    if (items.length === 0) {
-      alert('Adicione pelo menos um item.');
+    if (items.length === 0 && otherItems.length === 0) {
+      alert('Adicione pelo menos um item (Modelo ou Outros).');
       return;
     }
 
@@ -337,7 +371,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
       paymentStatus,
       paymentHistory,
       notes,
-      sellerName
+      sellerName,
+      otherItems
     };
 
     if (customerId) saleToSave.customerId = customerId;
@@ -394,13 +429,19 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
       return `📦 *${p?.name}${variantDesc}*${sizeDesc}\n   Qtd: ${item.quantity} ${typeDesc}\n   Un: R$ ${item.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n   Sub: R$ ${(item.price * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }).join('\n\n');
 
+    const otherItemsText = otherItems.map(item => {
+      return `✨ *${item.description || 'Outro Item'}*\n   Sub: R$ ${item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }).join('\n\n');
+
+    const allItemsText = [itemsText, otherItemsText].filter(Boolean).join('\n\n');
+
     const paymentMethod = paymentMethods.find(pm => pm.id === paymentMethodId);
     const paymentInfo = paymentMethod?.value ? `\n\n💳 *Pagamento: ${paymentMethod.name}*\nchave pix: ${paymentMethod.value}` : `\n\n💳 *Pagamento: ${paymentMethod?.name || 'A definir'}*`;
 
     const statusText = status === SaleStatus.QUOTE ? 'ORÇAMENTO' : 'PEDIDO';
     const discountText = discount > 0 ? `\n📉 *Desconto:* ${discountType === 'percentage' ? `${discount}%` : `R$ ${discount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}` : '';
 
-    return `Olá ${customer?.name || 'Cliente'}!\n\nSeu ${statusText} #${orderNumber}.\n\n*ITENS:*\n${itemsText}\n\n------------------\n💰 *Subtotal:* R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${discountText}\n💎 *TOTAL: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*\n------------------\nStatus: ${statusText}${paymentInfo}\n\nAguardamos sua confirmação!`;
+    return `Olá ${customer?.name || 'Cliente'}!\n\nSeu ${statusText} #${orderNumber}.\n\n*ITENS:*\n${allItemsText}\n\n------------------\n💰 *Subtotal:* R$ ${subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${discountText}\n💎 *TOTAL: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*\n------------------\nStatus: ${statusText}${paymentInfo}\n\nAguardamos sua confirmação!`;
   };
 
   const handleWhatsApp = () => {
@@ -415,8 +456,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
     }
 
     const items = getItems();
-    if (items.length === 0) {
-      alert('Adicione pelo menos um item.');
+    if (items.length === 0 && otherItems.length === 0) {
+      alert('Adicione pelo menos um item (Modelo ou Outros).');
       return;
     }
 
@@ -439,8 +480,8 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
     const customer = people.find(p => p.id === customerId);
     const items = getItems();
 
-    if (items.length === 0) {
-      alert('Adicione pelo menos um item.');
+    if (items.length === 0 && otherItems.length === 0) {
+      alert('Adicione pelo menos um item (Modelo ou Outros).');
       return;
     }
 
@@ -516,10 +557,19 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
         ];
       });
 
+      const otherItemsTableData = otherItems.map(item => [
+        item.description || 'Outro Item',
+        1,
+        `R$ ${item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        `R$ ${item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      ]);
+
+      const allTableData = [...tableData, ...otherItemsTableData];
+
       autoTable(doc, {
         startY: startY + 35,
         head: [['PRODUTO / DESCRIÇÃO', 'QTD', 'UNITÁRIO', 'TOTAL']],
-        body: tableData,
+        body: allTableData,
         theme: 'plain',
         headStyles: {
           fillColor: [241, 245, 249],
@@ -684,6 +734,15 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
         ctx.fillText(desc, 120, currentY);
         ctx.textAlign = 'right';
         ctx.fillText(`R$ ${(item.quantity * item.price).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 120, currentY);
+        ctx.textAlign = 'left';
+        currentY += 70;
+      });
+
+      otherItems.forEach(item => {
+        let desc = `${item.description || 'Outro Item'}`;
+        ctx.fillText(desc, 120, currentY);
+        ctx.textAlign = 'right';
+        ctx.fillText(`R$ ${item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 120, currentY);
         ctx.textAlign = 'left';
         currentY += 70;
       });
@@ -968,14 +1027,24 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
             <h3 className="text-[11px] font-black uppercase tracking-[0.15em] text-slate-400 leading-none">Cesta de Itens</h3>
             <p className="text-[8px] text-slate-300 font-bold uppercase tracking-widest mt-1">Selecione os produtos e variações</p>
           </div>
-          <button
-            onClick={() => setShowProductModal(true)}
-            className={`flex items-center gap-2 font-black text-[10px] uppercase tracking-widest bg-slate-900 dark:bg-indigo-600 text-white px-5 py-3 rounded-2xl shadow-xl active:scale-95 transition-all`}
-            aria-label="Adicionar modelo à cesta"
-            title="Adicionar Modelo"
-          >
-            <Plus size={14} strokeWidth={3} /> Modelo
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => addOtherItem()}
+              className={`flex items-center gap-2 font-black text-[10px] uppercase tracking-widest bg-amber-500 text-white px-5 py-3 rounded-2xl shadow-xl active:scale-95 transition-all`}
+              aria-label="Adicionar outro item (não modelo)"
+              title="Adicionar Outro Item"
+            >
+              <Plus size={14} strokeWidth={3} /> Outros
+            </button>
+            <button
+              onClick={() => setShowProductModal(true)}
+              className={`flex items-center gap-2 font-black text-[10px] uppercase tracking-widest bg-slate-900 dark:bg-indigo-600 text-white px-5 py-3 rounded-2xl shadow-xl active:scale-95 transition-all`}
+              aria-label="Adicionar modelo à cesta"
+              title="Adicionar Modelo"
+            >
+              <Plus size={14} strokeWidth={3} /> Modelo
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col gap-4">
@@ -1204,11 +1273,69 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
             );
           })}
 
-          {blocks.length === 0 && (
+          {/* Other Items List */}
+          {otherItems.length > 0 && (
+            <div className="flex flex-col gap-4 mt-2">
+              <div className="px-2">
+                <h4 className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-500 mb-2">Outros Itens</h4>
+              </div>
+              {otherItems.map((item, index) => (
+                <div key={item.id} className={`p-4 rounded-[2rem] border shadow-sm flex flex-col gap-3 relative group overflow-hidden ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
+                  <div className="flex justify-between items-center gap-3">
+                    <div className="flex-1">
+                      <input
+                        type="text"
+                        placeholder="Descrição do item"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl px-4 py-3 text-[11px] font-black tracking-tight text-slate-800 dark:text-slate-100 focus:ring-4 focus:ring-slate-900/5 dark:focus:ring-indigo-500/10 placeholder:text-slate-300 dark:placeholder:text-slate-700 outline-none"
+                        value={item.description}
+                        onChange={(e) => updateOtherItem(index, { description: e.target.value })}
+                        aria-label="Descrição do item"
+                        title="Descrição"
+                      />
+                    </div>
+                    <button
+                      onClick={() => removeOtherItem(index)}
+                      className="p-3 bg-rose-50 dark:bg-rose-900/30 text-rose-500 rounded-xl hover:bg-rose-100 transition-colors"
+                      aria-label="Remover item"
+                      title="Remover"
+                    >
+                      <Trash2 size={16} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400 text-xs">R$</div>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-800 rounded-2xl pl-[2.4rem] pr-4 py-3 text-[13px] font-black text-slate-800 dark:text-slate-100 focus:ring-4 focus:ring-slate-900/5 dark:focus:ring-indigo-500/10 transition-all outline-none"
+                        value={item.value || ''}
+                        onChange={(e) => updateOtherItem(index, { value: parseFloat(e.target.value) || 0 })}
+                        placeholder="0.00"
+                        aria-label="Valor do item"
+                        title="Valor"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => openCalculator(index)}
+                      className="w-12 h-12 shrink-0 flex items-center justify-center bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-2xl hover:bg-indigo-100 transition-colors"
+                      aria-label="Abrir calculadora de valor"
+                      title="Calculadora"
+                    >
+                      <Calculator size={16} strokeWidth={3} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {blocks.length === 0 && otherItems.length === 0 && (
             <div className="text-center py-20 bg-slate-50/30 dark:bg-slate-900/40 border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-[3rem] flex flex-col items-center">
               <Package size={40} className="text-slate-200 dark:text-slate-800 mb-2" strokeWidth={1} />
               <p className="text-[10px] font-black uppercase text-slate-300 dark:text-slate-700 tracking-[0.2em] italic px-10 text-center leading-relaxed">
-                Adicione modelos para iniciar a venda
+                Adicione modelos ou outros itens para iniciar a venda
               </p>
             </div>
           )}
@@ -1628,30 +1755,15 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
           <p className="text-2xl font-black text-white leading-none">R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
         </div>
         <div className="flex gap-2 w-full xl:w-auto">
-          {saleId && (
+          {!saleId && (
             <button
-              onClick={() => setShowCancelOnlyConfirm(true)}
-              disabled={status === SaleStatus.CANCELLED}
-              title={status === SaleStatus.CANCELLED ? "Venda Cancelada/Neutro" : "Cancelar (Sem Estorno)"}
-              className={`flex-1 h-12 px-2 rounded-full flex items-center justify-center gap-1.5 text-white font-black uppercase tracking-tight text-[9px] sm:text-[10px] transition-all active:scale-90 ${status === SaleStatus.CANCELLED ? 'bg-slate-700 cursor-not-allowed' : 'bg-white/10 hover:bg-slate-500 active:bg-slate-600'}`}
+              onClick={() => onCancel()}
+              title="Descartar Venda"
+              className={`flex-1 h-12 px-2 rounded-full flex items-center justify-center gap-1.5 text-white font-black uppercase tracking-tight text-[9px] sm:text-[10px] transition-all active:scale-90 bg-white/10 hover:bg-rose-500 active:bg-rose-600`}
             >
-              <Ban size={16} strokeWidth={2.5} className="shrink-0" /> <span className="line-clamp-1 break-all text-center leading-none mt-0.5">S/ Estorno</span>
+              <Trash2 size={16} strokeWidth={2.5} className="shrink-0" /> <span className="line-clamp-1 break-all text-center leading-none mt-0.5">Descartar</span>
             </button>
           )}
-          <button
-            onClick={() => {
-              if (saleId) {
-                setShowCancelConfirm(true);
-              } else {
-                onCancel();
-              }
-            }}
-            disabled={status === SaleStatus.CANCELLED}
-            title={saleId ? (status === SaleStatus.CANCELLED ? "Venda Cancelada/Estornada" : "Cancelar Venda e Estornar") : "Descartar"}
-            className={`flex-1 h-12 px-2 rounded-full flex items-center justify-center gap-1.5 text-white font-black uppercase tracking-tight text-[9px] sm:text-[10px] transition-all active:scale-90 ${status === SaleStatus.CANCELLED ? 'bg-slate-700 cursor-not-allowed' : 'bg-white/10 hover:bg-rose-500 active:bg-rose-600'}`}
-          >
-            {saleId ? <><RotateCcw size={16} strokeWidth={2.5} className="shrink-0" /> <span className="line-clamp-1 break-all text-center leading-none mt-0.5">Estornar</span></> : <><Trash2 size={16} strokeWidth={2.5} className="shrink-0" /> <span className="line-clamp-1 break-all text-center leading-none mt-0.5">Descartar</span></>}
-          </button>
           <button
             onClick={handleSave}
             disabled={isSaving}
@@ -1770,6 +1882,19 @@ export default function SaleFormView({ saleId, sales, products, grids, people, p
             if (type === 'PDF') handleExportPDF(obs);
             else handleExportJPG(obs);
           }}
+        />
+      )}
+
+      {calcModal && (
+        <CalculatorModal
+          isOpen={calcModal.isOpen}
+          initialValue={calcModal.value}
+          onClose={() => setCalcModal(null)}
+          onConfirm={(newValue) => {
+            updateOtherItem(calcModal.index, { value: newValue });
+            setCalcModal(null);
+          }}
+          isDarkMode={isDarkMode}
         />
       )}
     </div>

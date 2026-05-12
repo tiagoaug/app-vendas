@@ -44,6 +44,8 @@ export default function ReportDetailedView({
   const [supplierId, setSupplierId] = useState('');
   const [accountingFilter, setAccountingFilter] = useState<'ALL' | 'ACCOUNTING' | 'NON_ACCOUNTING'>('ALL');
   const [modelSearch, setModelSearch] = useState('');
+  const [showPending, setShowPending] = useState(true);
+  const [showCompleted, setShowCompleted] = useState(true);
   
   const suppliers = useMemo(() => people.filter(p => p.isSupplier), [people]);
   const customers = useMemo(() => people.filter(p => p.isCustomer), [people]);
@@ -345,8 +347,16 @@ export default function ReportDetailedView({
         }
     });
     
-    return [...filteredSales, ...filteredTransactions].sort((a, b) => b.date - a.date);
-  }, [sales, transactions, reportId, startDate, endDate, customerRelSearchId, peopleMap]);
+    return [...filteredSales, ...filteredTransactions]
+        .filter(item => {
+            const isPending = item.pending > 0;
+            const isCompleted = item.pending <= 0;
+            if (!showPending && isPending) return false;
+            if (!showCompleted && isCompleted) return false;
+            return true;
+        })
+        .sort((a, b) => b.date - a.date);
+  }, [sales, transactions, reportId, startDate, endDate, customerRelSearchId, peopleMap, showPending, showCompleted]);
 
   const getWhatsAppLink = (phone: string, message: string) => {
     let clean = phone.replace(/\D/g, '');
@@ -1140,10 +1150,34 @@ export default function ReportDetailedView({
       <div className="flex flex-col gap-4 px-4 mt-4 flex-grow pb-10">
         {/* Date Filter */}
          <div className={`p-5 rounded-3xl border shadow-sm ${isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-100'}`}>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3 flex items-center gap-2">
-                <Filter size={12} />
-                Filtros
-            </p>
+            <div className="flex items-center justify-between mb-3">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                    <Filter size={12} />
+                    Filtros
+                </p>
+                {reportId === 'relacionamento-cliente' && (
+                    <div className="flex gap-2">
+                        <label className="flex items-center gap-2 cursor-pointer px-2 py-1 -ml-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors">
+                            <input 
+                                type="checkbox" 
+                                checked={showPending} 
+                                onChange={(e) => setShowPending(e.target.checked)} 
+                                className="accent-rose-500 rounded w-4 h-4 cursor-pointer"
+                            />
+                            <span className="text-[11px] sm:text-xs font-bold text-slate-600 dark:text-slate-400 uppercase select-none">Pendentes</span>
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer px-2 py-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors">
+                            <input 
+                                type="checkbox" 
+                                checked={showCompleted} 
+                                onChange={(e) => setShowCompleted(e.target.checked)} 
+                                className="accent-emerald-500 rounded w-4 h-4 cursor-pointer"
+                            />
+                            <span className="text-[11px] sm:text-xs font-bold text-slate-600 dark:text-slate-400 uppercase select-none">Concluídos</span>
+                        </label>
+                    </div>
+                )}
+            </div>
             <div className="flex gap-2 items-center flex-wrap">
                 <div className="relative flex-1 min-w-[140px]">
                     <input 

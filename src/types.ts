@@ -161,6 +161,7 @@ export type Sale = {
   paymentHistory?: SalePayment[];
   notes?: string;
   sellerName?: string;
+  otherItems?: GeneralPurchaseItem[];
 };
 
 export type Person = {

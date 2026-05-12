@@ -8,6 +8,7 @@ import autoTable from 'jspdf-autotable';
 import { sharePDF, shareImage } from '../utils/pdfShare';
 import SalePaymentModal from '../components/SalePaymentModal';
 import ExportNoteModal from '../components/ExportNoteModal';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 interface SalesViewProps {
   sales: Sale[];
@@ -18,7 +19,7 @@ interface SalesViewProps {
   accounts: Account[];
   onAdd: () => void;
   onEdit: (sale: Sale) => void;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, isPermanent?: boolean, skipConfirm?: boolean) => void;
   onCancelOnly: (id: string) => void;
   onConvert: (id: string) => void;
   onPaySale: (saleId: string, amount: number, accountId: string, paymentMethodId: string, note: string) => Promise<void>;
@@ -58,6 +59,12 @@ export default function SalesView({
   const [paymentModalMode, setPaymentModalMode] = useState<'PAYMENT' | 'HISTORY'>('PAYMENT');
   const [whatsappMode, setWhatsappMode] = useState<'AUTO' | 'MANUAL'>('AUTO');
   const [editingMessage, setEditingMessage] = useState<{ sale: Sale, text: string } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    saleId: string | null;
+    isPermanent: boolean;
+    saleOrderNumber: string;
+  }>({ isOpen: false, saleId: null, isPermanent: false, saleOrderNumber: '' });
   const [noteModal, setNoteModal] = useState<{ isOpen: boolean, note: string } | null>(null);
   const [exportModal, setExportModal] = useState<{ isOpen: boolean, type: 'PDF' | 'JPG', sale: Sale | null }>({ isOpen: false, type: 'PDF', sale: null });
 
@@ -96,9 +103,21 @@ export default function SalesView({
       // Filter by Search Query (Name or ID)
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase();
-        const matchesName = s.customerName?.toLowerCase().includes(query);
-        const matchesId = s.orderNumber?.toLowerCase().includes(query);
-        if (!matchesName && !matchesId) return false;
+        const cleanQuery = query.replace(/[()\s-]/g, ''); // Ignora parênteses, espaços e traços
+        
+        const customer = people.find(p => p.id === s.customerId);
+        const nameToSearch = (s.customerName || customer?.name || '').toLowerCase();
+        const matchesName = nameToSearch.includes(query);
+        
+        const cleanOrderNumber = (s.orderNumber || '').toLowerCase().replace(/[()\s-]/g, '');
+        const matchesId = cleanOrderNumber.includes(cleanQuery);
+        
+        // Só busca por telefone se a pesquisa não contiver letras (evita que "T290" busque pelo número 290 no telefone)
+        const queryHasLetters = /[a-z]/i.test(query);
+        const cleanPhone = (customer?.phone || '').replace(/\D/g, '');
+        const matchesPhone = !queryHasLetters && query.replace(/\D/g, '').length > 0 && cleanPhone.includes(query.replace(/\D/g, ''));
+
+        if (!matchesName && !matchesId && !matchesPhone) return false;
       }
 
       // Filter by Year
@@ -108,7 +127,7 @@ export default function SalesView({
 
       return true;
     }).sort((a, b) => b.date - a.date); // Mais recentes primeiro
-  }, [sales, filter, paymentFilter, selectedStatuses, searchQuery, yearFilter]);
+  }, [sales, filter, paymentFilter, selectedStatuses, searchQuery, yearFilter, people]);
 
   const totals = useMemo(() => {
     return filteredSales.reduce((acc, sale) => {
@@ -140,13 +159,19 @@ export default function SalesView({
       return `📦 *${p?.name}${variantDesc}*${sizeDesc}\n   Qtd: ${item.quantity} ${typeDesc}\n   Un: R$ ${item.price.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n   Sub: R$ ${(item.price * item.quantity).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }).join('\n\n');
 
+    const otherItemsText = (sale.otherItems || []).map(item => {
+      return `✨ *${item.description || 'Outro Item'}*\n   Sub: R$ ${item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }).join('\n\n');
+
+    const allItemsText = [itemsText, otherItemsText].filter(Boolean).join('\n\n');
+
     const paymentMethod = paymentMethods.find(pm => pm.id === sale.paymentMethodId);
     const paymentInfo = paymentMethod?.value ? `\n\n💳 *Pagamento: ${paymentMethod.name}*\nchave pix: ${paymentMethod.value}` : `\n\n💳 *Pagamento: ${paymentMethod?.name || 'A definir'}*`;
 
     const statusText = sale.status === SaleStatus.QUOTE ? 'ORÇAMENTO' : 'PEDIDO';
     const discountText = sale.discount > 0 ? `\n📉 *Desconto:* R$ ${sale.discount.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
 
-    return `Olá ${customer?.name || sale.customerName || 'Cliente'}!\n\nSeu ${statusText} #${sale.orderNumber}.\n\n*ITENS:*\n${itemsText}\n\n------------------\n💰 *Subtotal:* R$ ${sale.subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${discountText}\n💎 *TOTAL: R$ ${sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*\n------------------\nStatus: ${statusText}${paymentInfo}\n\nAguardamos sua confirmação!`;
+    return `Olá ${customer?.name || sale.customerName || 'Cliente'}!\n\nSeu ${statusText} #${sale.orderNumber}.\n\n*ITENS:*\n${allItemsText}\n\n------------------\n💰 *Subtotal:* R$ ${sale.subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${discountText}\n💎 *TOTAL: R$ ${sale.total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*\n------------------\nStatus: ${statusText}${paymentInfo}\n\nAguardamos sua confirmação!`;
   };
 
   const handleCopyMessage = (sale: Sale) => {
@@ -247,10 +272,19 @@ export default function SalesView({
         ];
       });
 
+      const otherItemsTableData = (sale.otherItems || []).map(item => [
+        item.description || 'Outro Item',
+        1,
+        `R$ ${item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        `R$ ${item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+      ]);
+
+      const allTableData = [...tableData, ...otherItemsTableData];
+
       autoTable(doc, {
         startY: startY + 35,
         head: [['PRODUTO / DESCRIÇÃO', 'QTD', 'UNITÁRIO', 'TOTAL']],
-        body: tableData,
+        body: allTableData,
         theme: 'plain',
         headStyles: {
           fillColor: [241, 245, 249],
@@ -416,6 +450,15 @@ export default function SalesView({
         currentY += 70;
       });
 
+      (sale.otherItems || []).forEach(item => {
+        let desc = `${item.description || 'Outro Item'}`;
+        ctx.fillText(desc, 120, currentY);
+        ctx.textAlign = 'right';
+        ctx.fillText(`R$ ${item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, canvas.width - 120, currentY);
+        ctx.textAlign = 'left';
+        currentY += 70;
+      });
+
       // Totals
       currentY += 40;
       ctx.textAlign = 'right';
@@ -567,12 +610,12 @@ export default function SalesView({
         </div>
 
         {/* Search */}
-        <div className={`transition-all duration-300 ${showFilters || searchQuery ? 'h-auto opacity-100' : 'h-0 opacity-0 overflow-hidden'}`}>
+        <div className="mb-2">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input 
               type="text"
-              placeholder="Buscar venda..."
+              placeholder="Buscar por Nº da Venda ou Nome do Cliente..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className={`w-full h-14 pl-12 pr-4 rounded-2xl border text-xs font-bold uppercase tracking-widest outline-none transition-all ${isDarkMode ? 'bg-slate-900 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-800'}`}
@@ -677,9 +720,22 @@ export default function SalesView({
                     </div>
                   );
                 })}
-                {sale.items.length > 3 && (
+                {(sale.otherItems || []).slice(0, 2).map((item, idx) => (
+                  <div key={`other-${idx}`} className="flex items-center justify-between group/item">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp size={12} className="text-slate-300" />
+                      <p className={`text-[10px] font-bold uppercase tracking-tight ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {item.description || 'Outro Item'}
+                      </p>
+                    </div>
+                    <p className={`text-[10px] font-black ${isDarkMode ? 'text-slate-300' : 'text-slate-700'}`}>
+                      R$ {item.value.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}
+                    </p>
+                  </div>
+                ))}
+                {(sale.items.length + (sale.otherItems?.length || 0)) > 5 && (
                   <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest ml-5">
-                    + {sale.items.length - 3} itens
+                    + {(sale.items.length + (sale.otherItems?.length || 0)) - 5} itens
                   </p>
                 )}
               </div>
@@ -781,23 +837,23 @@ export default function SalesView({
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
-                          setExportModal({ isOpen: true, type: 'PDF', sale });
+                          setConfirmDialog({ isOpen: true, saleId: sale.id, isPermanent: false, saleOrderNumber: sale.orderNumber });
                           setShowOptionsId(null);
                         }}
-                        className="w-full flex items-center gap-2.5 p-3 text-left text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-all"
+                        className="w-full flex items-center gap-2.5 p-3 text-left text-[10px] font-black uppercase text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded-xl transition-all"
                       >
-                        <FileText size={14} /> Exportar PDF
+                        <RotateCcw size={14} /> Estornar e Cancelar
                       </button>
 
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
-                          // logic for cancelling or deleting if needed
+                          setConfirmDialog({ isOpen: true, saleId: sale.id, isPermanent: true, saleOrderNumber: sale.orderNumber });
                           setShowOptionsId(null);
                         }}
-                        className="w-full flex items-center gap-2.5 p-3 text-left text-[10px] font-black uppercase text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-all"
+                        className="w-full flex items-center gap-2.5 p-3 text-left text-[10px] font-black uppercase text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-all font-bold"
                       >
-                        <Trash2 size={14} /> Cancelar Venda
+                        <Trash2 size={14} /> Estornar e Excluir
                       </button>
                     </div>
                   </div>
@@ -1046,6 +1102,24 @@ export default function SalesView({
          </div>
        </div>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.isPermanent ? "Excluir Venda" : "Cancelar Venda"}
+        message={confirmDialog.isPermanent 
+          ? `ATENÇÃO: Você está prestes a EXCLUIR PERMANENTEMENTE a venda #${confirmDialog.saleOrderNumber}.\n\nIsso irá:\n1. Estornar os estoques dos produtos.\n2. Estornar os saldos das contas (financeiro).\n3. Remover as transações relacionadas.\n4. Apagar o registro definitivamente.\n\nDeseja continuar?`
+          : `Deseja estornar e cancelar a venda #${confirmDialog.saleOrderNumber}?\n\nIsso irá estornar estoques e financeiro, mas manterá o registro como CANCELADO.`}
+        confirmLabel={confirmDialog.isPermanent ? "Sim, Excluir" : "Sim, Cancelar"}
+        cancelLabel="Voltar"
+        onConfirm={() => {
+          if (confirmDialog.saleId) {
+            onDelete(confirmDialog.saleId, confirmDialog.isPermanent, true);
+          }
+          setConfirmDialog({ isOpen: false, saleId: null, isPermanent: false, saleOrderNumber: '' });
+        }}
+        onCancel={() => setConfirmDialog({ isOpen: false, saleId: null, isPermanent: false, saleOrderNumber: '' })}
+        isDanger={true}
+      />
     </div>
   );
 }

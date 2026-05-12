@@ -41,7 +41,7 @@ export default function ConfirmDialog({
             <h2 className="text-xl font-black uppercase tracking-tight text-slate-800 dark:text-white mb-2">
               {title}
             </h2>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-relaxed">
+            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 leading-relaxed whitespace-pre-wrap text-left">
               {message}
             </p>
           </div>
