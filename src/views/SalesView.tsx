@@ -600,9 +600,9 @@ export default function SalesView({
                       <h3 className={`text-[13px] font-black uppercase tracking-tight ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
                         {customer?.name || sale.customerName || 'Cliente'}
                       </h3>
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 flex-shrink-0">
                         <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest ${sale.status === SaleStatus.QUOTE ? 'bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'bg-indigo-100 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'}`}>
-                          {sale.status === SaleStatus.QUOTE ? 'ORÇAMENTO' : 'VENDA'}
+                          {sale.status === SaleStatus.QUOTE ? 'ORÇ.' : 'VENDA'}
                         </span>
                         {status === 'PAID' ? (
                           <span className="px-2 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[8px] font-black uppercase tracking-widest">
@@ -611,7 +611,7 @@ export default function SalesView({
                         ) : (
                           <>
                             <span className="px-2 py-0.5 rounded-md bg-amber-100 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[8px] font-black uppercase tracking-widest">
-                              PENDENTE
+                              PEND.
                             </span>
                             {sale.dueDate && (
                               <span className="px-2 py-0.5 rounded-md bg-red-600 text-white animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.5)] text-[8px] font-black uppercase tracking-widest">
